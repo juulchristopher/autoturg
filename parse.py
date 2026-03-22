@@ -79,6 +79,25 @@ def find_jarelturg_sheet(wb: openpyxl.Workbook):
     return None
 
 
+# Model names where the first word alone is ambiguous and needs the second word
+MULTI_WORD_MODELS = {'MODEL'}  # e.g. Tesla "MODEL S", "MODEL 3", "MODEL Y"
+
+
+def split_model_variant(full_model: str) -> tuple:
+    """Split a full model string into (model, variant).
+    Handles multi-word model names like Tesla MODEL S, MODEL 3, etc."""
+    parts = full_model.split()
+    if not parts:
+        return ('', '')
+    if len(parts) >= 2 and parts[0] in MULTI_WORD_MODELS:
+        model = f"{parts[0]} {parts[1]}"
+        variant = ' '.join(parts[2:])
+    else:
+        model = parts[0]
+        variant = ' '.join(parts[1:])
+    return (model, variant)
+
+
 def parse_sheet(ws) -> list:
     """Parse a järelturg worksheet into rows of {make, model, variant, fullModel, prodYear, count}."""
     rows_out = []
@@ -112,9 +131,7 @@ def parse_sheet(ws) -> list:
         if model_col is not None and model_col < len(vals):
             full_model = str(vals[model_col] or '').strip().upper()
 
-        parts = full_model.split(None, 1)
-        model = parts[0] if parts else ''
-        variant = parts[1] if len(parts) > 1 else ''
+        model, variant = split_model_variant(full_model)
 
         prod_year = None
         if prod_col is not None and prod_col < len(vals):

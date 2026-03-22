@@ -9,23 +9,23 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
 
 :root {
-  --bg: #07080a;
-  --s1: #0f1115;
-  --s2: #161a1f;
-  --s3: #1d2228;
-  --border: #252b33;
-  --border2: #2e3740;
-  --gold: #f0c040;
-  --gold2: rgba(240,192,64,0.12);
-  --blue: #5b9cf6;
-  --green: #4eca8b;
-  --red: #f06060;
-  --purple: #a78bfa;
-  --orange: #fb923c;
-  --teal: #2dd4bf;
-  --text: #dde2e8;
-  --muted: #5a6370;
-  --muted2: #8a95a0;
+  --bg: #f0f2f5;
+  --s1: #ffffff;
+  --s2: #f8f9fb;
+  --s3: #eef0f4;
+  --border: #dde1e8;
+  --border2: #cdd3dc;
+  --gold: #c8960a;
+  --gold2: rgba(200,150,10,0.08);
+  --blue: #2563eb;
+  --green: #16a34a;
+  --red: #dc2626;
+  --purple: #7c3aed;
+  --orange: #ea580c;
+  --teal: #0d9488;
+  --text: #1a1f2e;
+  --muted: #6b7280;
+  --muted2: #4b5563;
   --radius: 10px;
   --font: 'DM Sans', sans-serif;
   --mono: 'DM Mono', monospace;
@@ -194,8 +194,8 @@ body {
   transition: all 0.15s;
 }
 .btn:hover { border-color: var(--gold); color: var(--gold); }
-.btn.primary { background: var(--gold); color: #000; border-color: var(--gold); }
-.btn.primary:hover { background: #ffd060; border-color: #ffd060; color: #000; }
+.btn.primary { background: var(--gold); color: #fff; border-color: var(--gold); }
+.btn.primary:hover { background: #b08508; border-color: #b08508; color: #fff; }
 
 .timeline-select {
   background: var(--s2);
@@ -366,7 +366,7 @@ body {
 }
 .chip-label {
   background: var(--gold);
-  color: #000;
+  color: #fff;
   font-weight: 700;
   border-radius: 3px;
   padding: 1px 5px;
@@ -443,7 +443,7 @@ body {
   border: 1.5px dashed var(--border2);
   border-radius: var(--radius);
   padding: 14px;
-  min-height: 90px;
+  min-height: 170px;
   position: relative;
   transition: border-color 0.15s;
 }
@@ -457,7 +457,19 @@ body {
   color: var(--muted);
   margin-bottom: 8px;
 }
-.model-slot select, .model-slot-make, .model-slot-model {
+.combobox-label {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+.combobox-wrapper {
+  position: relative;
+  margin-bottom: 5px;
+}
+.combobox-input {
   width: 100%;
   background: var(--s3);
   border: 1px solid var(--border);
@@ -466,10 +478,47 @@ body {
   font-family: var(--mono);
   font-size: 11px;
   padding: 5px 8px;
-  cursor: pointer;
-  margin-bottom: 5px;
+  cursor: text;
 }
-.model-slot select:focus { outline: none; border-color: var(--gold); }
+.combobox-input:focus { outline: none; border-color: var(--gold); }
+.combobox-input:disabled { opacity: 0.4; cursor: not-allowed; }
+.combobox-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+.combobox-dropdown.open { display: block; }
+.combobox-option {
+  padding: 5px 8px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.combobox-option:hover, .combobox-option.highlighted { background: var(--s3); }
+.combobox-option.selected { color: var(--gold); }
+.combobox-option .cb-count {
+  color: var(--muted);
+  font-size: 9px;
+}
+.combobox-hint {
+  padding: 5px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
 .slot-clear {
   position: absolute;
   top: 8px; right: 8px;
@@ -715,7 +764,7 @@ body {
 
           <!-- Slot picker -->
           <div class="card" style="margin-bottom:16px">
-            <div class="card-title" style="margin-bottom:12px">Select up to 5 Make · Model combinations</div>
+            <div class="card-title" style="margin-bottom:12px">Select up to 5 Make · Model · Configuration combinations</div>
             <div class="model-pick-grid" id="modelPickGrid"></div>
             <button class="btn" onclick="renderComparison()" style="margin-top:4px">📊 Update Charts</button>
           </div>
@@ -815,12 +864,12 @@ let charts = {};
 // Comparison slots: up to 5 {make, model}
 let slots = [null, null, null, null, null];
 
-const COLORS = ['#f0c040','#5b9cf6','#4eca8b','#f06060','#a78bfa'];
+const COLORS = ['#c8960a','#2563eb','#16a34a','#dc2626','#7c3aed'];
 const MAKE_COLORS = {
-  'VOLKSWAGEN':'#5b9cf6','TOYOTA':'#f06060','BMW':'#4eca8b','MERCEDES-BENZ':'#a78bfa',
-  'AUDI':'#fb923c','VOLVO':'#2dd4bf','SKODA':'#f0c040','FORD':'#e879f9',
-  'HONDA':'#f87171','HYUNDAI':'#34d399','KIA':'#fbbf24','NISSAN':'#818cf8',
-  'MAZDA':'#6ee7b7','RENAULT':'#fca5a5','OPEL':'#67e8f9',
+  'VOLKSWAGEN':'#2563eb','TOYOTA':'#dc2626','BMW':'#16a34a','MERCEDES-BENZ':'#7c3aed',
+  'AUDI':'#ea580c','VOLVO':'#0d9488','SKODA':'#c8960a','FORD':'#c026d3',
+  'HONDA':'#e11d48','HYUNDAI':'#059669','KIA':'#d97706','NISSAN':'#4f46e5',
+  'MAZDA':'#10b981','RENAULT':'#f43f5e','OPEL':'#0891b2',
 };
 
 function colorFor(make, idx) {
@@ -1020,14 +1069,14 @@ function renderOverview() {
       labels: [...pie10.map(([k])=>k), other>0?'Others':null].filter(Boolean),
       datasets:[{
         data: [...pie10.map(([,v])=>v), other>0?other:null].filter(v=>v!==null),
-        backgroundColor: [...pie10.map(([m],i)=>colorFor(m,i)+'cc'), '#374151'],
-        borderColor: '#0f1115', borderWidth: 2, hoverOffset: 5,
+        backgroundColor: [...pie10.map(([m],i)=>colorFor(m,i)+'cc'), '#d1d5db'],
+        borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '62%',
       plugins: {
-        legend: { position:'right', labels:{ color:'#8a95a0', font:{family:"'DM Mono',monospace",size:9}, padding:8, boxWidth:10 }},
+        legend: { position:'right', labels:{ color:'#6b7280', font:{family:"'DM Mono',monospace",size:9}, padding:8, boxWidth:10 }},
         tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.toLocaleString()} (${(ctx.parsed*100/total).toFixed(1)}%)` }}
       }
     }
@@ -1043,8 +1092,8 @@ function renderOverview() {
       labels,
       datasets:[{
         data: totals,
-        backgroundColor: '#f0c04033',
-        borderColor: '#f0c040',
+        backgroundColor: 'rgba(200,150,10,0.15)',
+        borderColor: '#c8960a',
         borderWidth: 1, borderRadius: 4,
       }]
     },
@@ -1084,17 +1133,119 @@ function renderComparisonPage() {
 function allMakes() {
   const makeMap = {};
   filteredMonths().flatMap(m=>m.rows).forEach(r=>{ makeMap[r.make]=(makeMap[r.make]||0)+r.count; });
-  return Object.entries(makeMap).sort((a,b)=>b[1]-a[1]).map(([m])=>m);
+  return Object.entries(makeMap).sort((a,b)=>b[1]-a[1]);
 }
 
 function modelsForMake(make) {
   const mm = {};
   filteredMonths().flatMap(m=>m.rows).filter(r=>r.make===make).forEach(r=>{ mm[r.model]=(mm[r.model]||0)+r.count; });
-  return Object.entries(mm).sort((a,b)=>b[1]-a[1]).map(([m])=>m);
+  return Object.entries(mm).sort((a,b)=>b[1]-a[1]);
+}
+
+function variantsForMakeModel(make, model) {
+  const vm = {};
+  filteredMonths().flatMap(m=>m.rows)
+    .filter(r => r.make===make && r.model===model && r.variant)
+    .forEach(r => { vm[r.variant]=(vm[r.variant]||0)+r.count; });
+  return Object.entries(vm).sort((a,b)=>b[1]-a[1]);
+}
+
+// Close all open combobox dropdowns when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.combobox-wrapper')) {
+    document.querySelectorAll('.combobox-dropdown.open').forEach(d => d.classList.remove('open'));
+  }
+});
+
+function createCombobox({placeholder, options, selectedValue, onSelect, disabled, allLabel}) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'combobox-wrapper';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'combobox-input';
+  input.placeholder = placeholder;
+  input.value = selectedValue || '';
+  if (disabled) input.disabled = true;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'combobox-dropdown';
+
+  let highlightIdx = -1;
+  const MAX_VISIBLE = 200;
+
+  function renderOptions(filter) {
+    dropdown.innerHTML = '';
+    highlightIdx = -1;
+    const q = (filter || '').toLowerCase();
+    let filtered = options;
+    if (q) filtered = options.filter(o => o[0].toLowerCase().includes(q));
+
+    // "All" option at top if allLabel is provided
+    if (allLabel && !q) {
+      const allOpt = document.createElement('div');
+      allOpt.className = 'combobox-option' + (!selectedValue ? ' selected' : '');
+      allOpt.innerHTML = `<span>${allLabel}</span>`;
+      allOpt.addEventListener('mousedown', (e) => { e.preventDefault(); input.value = ''; onSelect(''); close(); });
+      dropdown.appendChild(allOpt);
+    }
+
+    const show = filtered.slice(0, MAX_VISIBLE);
+    show.forEach(([value, count], idx) => {
+      const opt = document.createElement('div');
+      opt.className = 'combobox-option' + (value === selectedValue ? ' selected' : '');
+      opt.dataset.idx = idx;
+      opt.innerHTML = `<span>${value || '(unspecified)'}</span><span class="cb-count">${count.toLocaleString()}</span>`;
+      opt.addEventListener('mousedown', (e) => { e.preventDefault(); input.value = value; onSelect(value); close(); });
+      dropdown.appendChild(opt);
+    });
+    if (filtered.length > MAX_VISIBLE) {
+      const hint = document.createElement('div');
+      hint.className = 'combobox-hint';
+      hint.textContent = `Type to narrow… (${filtered.length - MAX_VISIBLE} more)`;
+      dropdown.appendChild(hint);
+    }
+    if (filtered.length === 0 && q) {
+      const hint = document.createElement('div');
+      hint.className = 'combobox-hint';
+      hint.textContent = 'No matches';
+      dropdown.appendChild(hint);
+    }
+  }
+
+  function open() { dropdown.classList.add('open'); renderOptions(input.value); }
+  function close() { dropdown.classList.remove('open'); highlightIdx = -1; }
+
+  function highlightMove(dir) {
+    const items = dropdown.querySelectorAll('.combobox-option');
+    if (!items.length) return;
+    items.forEach(i => i.classList.remove('highlighted'));
+    highlightIdx = Math.max(0, Math.min(items.length - 1, highlightIdx + dir));
+    items[highlightIdx].classList.add('highlighted');
+    items[highlightIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  input.addEventListener('focus', open);
+  input.addEventListener('input', () => { open(); renderOptions(input.value); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlightMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightMove(-1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const hl = dropdown.querySelector('.combobox-option.highlighted');
+      if (hl) hl.dispatchEvent(new MouseEvent('mousedown'));
+      else close();
+    }
+    else if (e.key === 'Escape') { close(); input.blur(); }
+  });
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(dropdown);
+  return wrapper;
 }
 
 function buildModelSlots() {
-  const makes = allMakes();
+  const makeOpts = allMakes();
   const grid = document.getElementById('modelPickGrid');
   grid.innerHTML = '';
 
@@ -1105,32 +1256,53 @@ function buildModelSlots() {
     div.className = `model-slot${slot?' filled':''}`;
     div.id = `slot-${i}`;
 
-    // make select
-    const mkSel = document.createElement('select');
-    mkSel.className = 'model-slot-make';
-    mkSel.innerHTML = `<option value="">-- Make --</option>` +
-      makes.map(m=>`<option value="${m}" ${slot?.make===m?'selected':''}>${m}</option>`).join('');
-    mkSel.onchange = () => {
-      slots[i] = mkSel.value ? { make: mkSel.value, model: '' } : null;
-      buildModelSlots();
-    };
-
-    // model select
-    const mdSel = document.createElement('select');
-    mdSel.className = 'model-slot-model';
-    if (slot?.make) {
-      const models = modelsForMake(slot.make);
-      mdSel.innerHTML = `<option value="">-- All models --</option>` +
-        models.map(m=>`<option value="${m}" ${slot?.model===m?'selected':''}>${m||'(unspecified)'}</option>`).join('');
-      mdSel.onchange = () => { if(slots[i]) slots[i].model = mdSel.value; };
-    } else {
-      mdSel.innerHTML = `<option value="">-- Select make first --</option>`;
-      mdSel.disabled = true;
-    }
-
     const numLabel = document.createElement('div');
     numLabel.className = 'model-slot-num';
     numLabel.textContent = `Slot ${i+1}`;
+
+    // Maker combobox
+    const mkLabel = document.createElement('div');
+    mkLabel.className = 'combobox-label';
+    mkLabel.textContent = 'MAKER';
+    const mkCombo = createCombobox({
+      placeholder: '-- Select maker --',
+      options: makeOpts,
+      selectedValue: slot?.make || '',
+      onSelect: (val) => {
+        slots[i] = val ? { make: val, model: '', variant: '' } : null;
+        buildModelSlots();
+      }
+    });
+
+    // Model combobox
+    const mdLabel = document.createElement('div');
+    mdLabel.className = 'combobox-label';
+    mdLabel.textContent = 'MODEL';
+    const modelOpts = slot?.make ? modelsForMake(slot.make) : [];
+    const mdCombo = createCombobox({
+      placeholder: slot?.make ? '-- Select model --' : '-- Select maker first --',
+      options: modelOpts,
+      selectedValue: slot?.model || '',
+      disabled: !slot?.make,
+      onSelect: (val) => {
+        if (slots[i]) { slots[i].model = val; slots[i].variant = ''; }
+        buildModelSlots();
+      }
+    });
+
+    // Configuration combobox
+    const cfgLabel = document.createElement('div');
+    cfgLabel.className = 'combobox-label';
+    cfgLabel.textContent = 'CONFIGURATION';
+    const variantOpts = (slot?.make && slot?.model) ? variantsForMakeModel(slot.make, slot.model) : [];
+    const cfgCombo = createCombobox({
+      placeholder: (slot?.make && slot?.model) ? '-- All configurations --' : '-- Select model first --',
+      options: variantOpts,
+      selectedValue: slot?.variant || '',
+      disabled: !(slot?.make && slot?.model),
+      allLabel: 'All configurations',
+      onSelect: (val) => { if (slots[i]) slots[i].variant = val; }
+    });
 
     const colorBar = document.createElement('div');
     colorBar.className = 'slot-color-bar';
@@ -1145,8 +1317,12 @@ function buildModelSlots() {
     }
 
     div.appendChild(numLabel);
-    div.appendChild(mkSel);
-    div.appendChild(mdSel);
+    div.appendChild(mkLabel);
+    div.appendChild(mkCombo);
+    div.appendChild(mdLabel);
+    div.appendChild(mdCombo);
+    div.appendChild(cfgLabel);
+    div.appendChild(cfgCombo);
     div.appendChild(colorBar);
     grid.appendChild(div);
   }
@@ -1169,13 +1345,17 @@ function renderComparison() {
     return months.flatMap(m=>
       m.rows.filter(r =>
         r.make === slot.make &&
-        (!slot.model || r.model === slot.model)
+        (!slot.model || r.model === slot.model) &&
+        (!slot.variant || r.variant === slot.variant)
       ).map(r => ({...r, monthLabel: m.label, year: m.year, month: m.month}))
     );
   }
 
   function slotLabel(slot) {
-    return slot.model ? `${slot.make} ${slot.model}` : slot.make;
+    let label = slot.make;
+    if (slot.model) label += ' ' + slot.model;
+    if (slot.variant) label += ' ' + slot.variant;
+    return label;
   }
 
   // ── Line chart: monthly volume
@@ -1190,7 +1370,7 @@ function renderComparison() {
           return {
             label: slotLabel(s),
             data: months.map(m =>
-              m.rows.filter(r=>r.make===s.make&&(!s.model||r.model===s.model))
+              m.rows.filter(r=>r.make===s.make&&(!s.model||r.model===s.model)&&(!s.variant||r.variant===s.variant))
                     .reduce((sum,r)=>sum+r.count,0)
             ),
             borderColor: color,
@@ -1302,9 +1482,9 @@ function renderComparison() {
 // ═══════════════════════════════════════════════
 // CHART HELPERS
 // ═══════════════════════════════════════════════
-const gridColor = 'rgba(255,255,255,0.04)';
+const gridColor = 'rgba(0,0,0,0.06)';
 const tickFont = { family:"'DM Mono',monospace", size:10 };
-const tickColor = '#5a6370';
+const tickColor = '#6b7280';
 
 function chartOpts({ yLabel='', showLegend=false, barMode=false }) {
   return {
@@ -1315,8 +1495,8 @@ function chartOpts({ yLabel='', showLegend=false, barMode=false }) {
       legend: showLegend ? {
         labels: { color: tickColor, font: tickFont, padding: 14, boxWidth: 12 }
       } : { display: false },
-      tooltip: { backgroundColor:'#1d2228', borderColor:'#2e3740', borderWidth:1,
-        titleColor:'#dde2e8', bodyColor:'#8a95a0',
+      tooltip: { backgroundColor:'#ffffff', borderColor:'#dde1e8', borderWidth:1,
+        titleColor:'#1a1f2e', bodyColor:'#4b5563',
         callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString()}` }
       }
     },

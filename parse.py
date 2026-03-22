@@ -19,9 +19,29 @@ DATA_FILE = Path(__file__).resolve().parent / "data.json"
 SKIP_MAKES = {'KOKKU', 'TOTAL', 'ZUSAMMEN', 'SUM', 'MARK', 'MÄRK'}
 
 
-def xlsx_url(month: int, year: int) -> str:
-    mm = str(month).zfill(2)
-    return f"{BASE_URL}/{year}-{mm}/INFOLEHT-{mm}{year}.xlsx"
+def candidate_urls(data_month: int, data_year: int) -> list:
+    """Generate candidate URLs for a given data month.
+    The file for data month M is uploaded in folder month M+1."""
+    mm = str(data_month).zfill(2)
+    # Upload folder is one month after the data month
+    upload_month = data_month + 1
+    upload_year = data_year
+    if upload_month > 12:
+        upload_month = 1
+        upload_year += 1
+    um = str(upload_month).zfill(2)
+
+    urls = []
+    # Primary pattern: folder={upload_year}-{upload_month}, file=INFOLEHT-{MM}{YYYY}
+    for ext in ('.xlsx', '.xls'):
+        urls.append(f"{BASE_URL}/{upload_year}-{um}/INFOLEHT-{mm}{data_year}{ext}")
+    # Alt: folder matches data month
+    for ext in ('.xlsx', '.xls'):
+        urls.append(f"{BASE_URL}/{data_year}-{mm}/INFOLEHT-{mm}{data_year}{ext}")
+    # Alt: with suffix
+    for ext in ('.xlsx', '.xls'):
+        urls.append(f"{BASE_URL}/{upload_year}-{um}/INFOLEHT-{mm}{data_year}_statistika_esmased_ja_uued{ext}")
+    return urls
 
 
 def download(url: str) -> bytes:
@@ -137,43 +157,66 @@ def save_data(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def main():
-    today = date.today()
-    # The file for month M is published around the 20th of month M+1,
-    # so we fetch the previous month's data
-    target = today.replace(day=1) - timedelta(days=1)
-    month, year = target.month, target.year
-
+def fetch_month(month: int, year: int) -> bool:
+    """Try to fetch and parse a single month. Returns True on success."""
     print(f"Fetching infoleht for {MONTHS_EN[month-1]} {year}...")
-    url = xlsx_url(month, year)
-    print(f"  URL: {url}")
+    urls = candidate_urls(month, year)
 
-    try:
-        raw = download(url)
-    except (URLError, HTTPError) as e:
-        print(f"  Download failed: {e}")
-        sys.exit(1)
+    raw = None
+    used_url = None
+    for url in urls:
+        try:
+            raw = download(url)
+            if len(raw) < 1000:
+                raw = None
+                continue
+            used_url = url
+            print(f"  Downloaded: {url}")
+            break
+        except (URLError, HTTPError):
+            continue
 
-    if len(raw) < 1000:
-        print("  File too small — likely not valid")
-        sys.exit(1)
+    if raw is None:
+        print(f"  No file found for {MONTHS_EN[month-1]} {year}")
+        return False
 
-    tmp = DATA_FILE.parent / f"_tmp_infoleht.xlsx"
+    is_xls = used_url.endswith('.xls')
+    tmp = DATA_FILE.parent / f"_tmp_infoleht{'.xls' if is_xls else '.xlsx'}"
     tmp.write_bytes(raw)
 
     try:
-        wb = openpyxl.load_workbook(tmp, read_only=True, data_only=True)
+        if is_xls:
+            # openpyxl can't read .xls — use xlrd via a temp conversion
+            try:
+                import xlrd
+                xls_wb = xlrd.open_workbook(str(tmp))
+                # Convert to xlsx in memory
+                from openpyxl import Workbook
+                wb = Workbook()
+                for si, sheet in enumerate(xls_wb.sheets()):
+                    ws = wb.active if si == 0 else wb.create_sheet()
+                    ws.title = sheet.name
+                    for r in range(sheet.nrows):
+                        for c in range(sheet.ncols):
+                            ws.cell(row=r+1, column=c+1, value=sheet.cell_value(r, c))
+            except ImportError:
+                print("  xlrd not installed, cannot read .xls files")
+                return False
+        else:
+            wb = openpyxl.load_workbook(tmp, read_only=True, data_only=True)
+
         ws = find_jarelturg_sheet(wb)
         if ws is None:
             print(f"  No järelturg sheet found in {wb.sheetnames}")
-            sys.exit(1)
+            return False
 
         rows = parse_sheet(ws)
-        wb.close()
+        if hasattr(wb, 'close'):
+            wb.close()
 
         if not rows:
             print("  No data rows parsed")
-            sys.exit(1)
+            return False
 
         print(f"  Parsed {len(rows)} rows from sheet '{ws.title}'")
 
@@ -188,9 +231,20 @@ def main():
         })
         save_data(data)
         print(f"  Saved to {DATA_FILE} ({len(data['months'])} months total)")
+        return True
 
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def main():
+    today = date.today()
+    # Fetch the previous month's data (published ~20th of current month)
+    target = today.replace(day=1) - timedelta(days=1)
+    month, year = target.month, target.year
+
+    if not fetch_month(month, year):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

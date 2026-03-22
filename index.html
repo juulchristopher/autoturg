@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🇪🇪 Järelturg — Estonian Used Car Market</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
@@ -619,8 +618,7 @@ body {
         <div class="page-sub" id="pageSub">Top 5 makes · järelturg transactions</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn" onclick="showPage('sync')">⬆ Load Data</button>
-        <button class="btn primary" onclick="triggerAutoFetch()" id="fetchBtn">🔄 Fetch Latest</button>
+        <button class="btn" onclick="showPage('sync')">📊 Data Status</button>
       </div>
     </div>
 
@@ -633,7 +631,7 @@ body {
         <div id="overviewEmpty" class="empty">
           <div class="empty-icon">📈</div>
           <div class="empty-title">No data loaded</div>
-          <div class="empty-text">Go to Sync & Upload to load monthly infoleht files<br>or click "Fetch Latest" to download automatically</div>
+          <div class="empty-text">Data is loading…</div>
         </div>
 
         <!-- dashboard -->
@@ -759,50 +757,25 @@ body {
         </div>
       </div>
 
-      <!-- ══════════ PAGE: SYNC ══════════ -->
+      <!-- ══════════ PAGE: DATA STATUS ══════════ -->
       <div class="page" id="page-sync">
 
         <div class="schedule-banner">
           <span class="schedule-banner-icon">📅</span>
           <div class="schedule-banner-text">
-            <b>Auto-fetch runs on the 20th of each month.</b> When you open this dashboard on or after the 20th, it will automatically try to fetch the newest infoleht file from Transpordiamet.<br>
+            <b>Data updates automatically on the 20th of each month</b> via GitHub Actions, fetching the latest infoleht from Transpordiamet.<br>
             <span class="mono">Source: transpordiamet.ee · Tab: järelturg · Sheet: omanikuvahetused / owner changes</span>
           </div>
-        </div>
-
-        <div class="section-head">
-          <div class="section-title">Manual File Upload</div>
-          <span class="section-badge">XLSX / XLS</span>
-        </div>
-
-        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-          <div class="upload-zone-icon">📂</div>
-          <div class="upload-zone-title">Drop infoleht files here</div>
-          <div class="upload-zone-hint">
-            Accepts .xlsx or .xls monthly files · Multiple files supported<br>
-            <a href="https://www.transpordiamet.ee/soidukitega-tehtud-toimingute-statistika" target="_blank" onclick="event.stopPropagation()">transpordiamet.ee →</a>
-          </div>
-        </div>
-        <input type="file" id="fileInput" multiple accept=".xlsx,.xls" style="display:none">
-        <div class="chips" id="fileChips"></div>
-
-        <div style="margin-top:24px;margin-bottom:12px" class="section-head">
-          <div class="section-title">Auto-Fetch Log</div>
-          <span class="section-badge">CORS PROXY REQUIRED FOR DIRECT FETCH</span>
-        </div>
-        <div class="fetch-log" id="fetchLog">
-          <span class="log-info">ℹ</span> Ready. Transpordiamet files require manual download due to CORS restrictions.<br>
-          <span class="log-info">ℹ</span> Upload files manually above, or self-host with a CORS proxy.<br>
         </div>
 
         <div style="margin-top:24px">
           <div class="section-head" style="margin-bottom:12px">
             <div class="section-title">Loaded Months</div>
-            <span class="section-badge" id="loadedCount">0 FILES</span>
+            <span class="section-badge" id="loadedCount">0 MONTHS</span>
           </div>
           <div id="loadedMonthsList" class="card">
             <div class="empty" style="padding:32px">
-              <div class="empty-text">No months loaded yet</div>
+              <div class="empty-text">Loading data…</div>
             </div>
           </div>
         </div>
@@ -816,8 +789,7 @@ body {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DB_KEY = 'jarelturDB_v3';
-let db = loadDB(); // { months: [{label, year, month, rows:[{make,model,prodYear,count}]}] }
+let db = { months: [] };
 let charts = {};
 
 // Comparison slots: up to 5 {make, model}
@@ -835,24 +807,6 @@ function colorFor(make, idx) {
   return MAKE_COLORS[make] || COLORS[idx % COLORS.length];
 }
 
-// ═══════════════════════════════════════════════
-// PERSISTENCE
-// ═══════════════════════════════════════════════
-function loadDB() {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
-  return { months: [] };
-}
-
-function saveDB() {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  } catch(e) {
-    log('warn', 'Storage quota exceeded — data not persisted');
-  }
-}
 
 // ═══════════════════════════════════════════════
 // NAVIGATION
@@ -860,7 +814,7 @@ function saveDB() {
 const pageTitles = {
   overview: ['Monthly Overview', 'Top 5 makes · järelturg transactions'],
   comparison: ['Model Comparison', 'Up to 5 models · transactions & production year'],
-  sync: ['Sync & Upload', 'Load monthly infoleht files from Transpordiamet'],
+  sync: ['Data Status', 'Auto-updated järelturg data from Transpordiamet'],
 };
 
 function showPage(id) {
@@ -879,248 +833,27 @@ function showPage(id) {
 }
 
 // ═══════════════════════════════════════════════
-// FILE HANDLING
+// DATA LOADING
 // ═══════════════════════════════════════════════
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('over'));
-uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('over'); handleFiles(e.dataTransfer.files); });
-document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value=''; });
-
-async function handleFiles(files) {
-  setProgress(10);
-  let loaded = 0;
-  for (const f of files) {
-    const ok = await parseFile(f);
-    if (ok) loaded++;
-    setProgress(10 + 80 * loaded / files.length);
-  }
-  setProgress(100);
-  db.months.sort((a,b) => a.year*100+a.month - (b.year*100+b.month));
-  saveDB();
-  updateSidebarStatus();
-  updateSyncPage();
-  log('ok', `Loaded ${loaded} file(s). ${db.months.length} months in database.`);
-}
-
-async function parseFile(file) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: 'array' });
-        const info = detectMonthYear(file.name, wb);
-        if (!info) { log('err', `Could not detect month/year for: ${file.name}`); resolve(false); return; }
-
-        const rows = extractJarelturg(wb, info, file.name);
-        if (!rows || rows.length === 0) {
-          log('warn', `No järelturg data found in ${file.name} (sheets: ${wb.SheetNames.join(', ')})`);
-          resolve(false);
-          return;
-        }
-
-        // upsert
-        db.months = db.months.filter(m => !(m.year===info.year && m.month===info.month));
-        db.months.push({ ...info, rows });
-        addChip(file.name, info.label);
-        log('ok', `✓ ${info.label}: ${rows.length} rows from "${info.sheetUsed}"`);
-        resolve(true);
-      } catch(err) {
-        log('err', `Parse error ${file.name}: ${err.message}`);
-        resolve(false);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-function detectMonthYear(filename, wb) {
-  const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  // Filename pattern: INFOLEHT-MMYYYY or INFOLEHT-MM-YYYY
-  let m = filename.match(/[_\-]0?(\d{1,2})[-_]?(20\d{2})/);
-  if (!m) m = filename.match(/(20\d{2})[_\-]0?(\d{1,2})/);
-  if (m) {
-    let month, year;
-    if (parseInt(m[1]) > 12) { year=parseInt(m[1]); month=parseInt(m[2]); }
-    else { month=parseInt(m[1]); year=parseInt(m[2]); }
-    return { month, year, label: `${mn[month-1]} ${year}`, sheetUsed: '' };
-  }
-  return null;
-}
-
-function extractJarelturg(wb, info, filename) {
-  // Priority: find sheet whose name contains järelturg / jarelturg / omaniku / owner / transactions
-  const priority = wb.SheetNames.filter(n => {
-    const lo = n.toLowerCase();
-    return lo.includes('järelturg') || lo.includes('jarelturg') || lo.includes('omaniku') ||
-           lo.includes('owner') || lo.includes('used') || lo.includes('kasutatud');
-  });
-  const sheetsToTry = [...priority, ...wb.SheetNames.filter(n => !priority.includes(n))];
-
-  for (const sheetName of sheetsToTry) {
-    const ws = wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    if (!json || json.length < 3) continue;
-
-    const rows = tryParseJarelturgSheet(json);
-    if (rows && rows.length > 5) {
-      info.sheetUsed = sheetName;
-      return rows;
-    }
-  }
-  return [];
-}
-
-function tryParseJarelturgSheet(json) {
-  const rows = [];
-  // Find header row with MARK/MUDEL columns
-  let hRow = -1, makeCol = -1, modelCol = -1, prodYearCol = -1, countCol = -1;
-
-  for (let i = 0; i < Math.min(json.length, 25); i++) {
-    const row = json[i].map(c => String(c).toLowerCase().trim());
-    const mkIdx = row.findIndex(c => c === 'mark' || c === 'märk' || c === 'make' || (c.includes('mark') && c.length < 8));
-    if (mkIdx < 0) continue;
-
-    hRow = i;
-    makeCol = mkIdx;
-    // model: next col or "mudel"
-    modelCol = row.findIndex((c, idx) => idx !== mkIdx && (c === 'mudel' || c === 'model' || c.includes('mudel')));
-    if (modelCol < 0) modelCol = mkIdx + 1;
-
-    // production year: "aasta" or "tootmis" or "aastamudel"
-    prodYearCol = row.findIndex(c =>
-      c.includes('aasta') || c === 'year' || c.includes('tootmis') || c === 'prod' || c === 'year'
-    );
-
-    // count: "arv" or "kokku" or "hulk" or "transactions" — last numeric header
-    countCol = row.findIndex(c =>
-      c === 'arv' || c === 'kokku' || c === 'hulk' || c === 'transactions' || c.includes('count')
-    );
-    if (countCol < 0) {
-      // take rightmost column that looks like a count header (number-like or empty)
-      for (let j = row.length - 1; j > (modelCol >= 0 ? modelCol : mkIdx); j--) {
-        if (/^\d+$/.test(row[j]) || row[j] === '' || row[j] === 'arv' || row[j] === 'hulk') {
-          countCol = j; break;
-        }
-      }
-    }
-    if (countCol < 0) countCol = row.length - 1;
-    break;
-  }
-
-  if (hRow < 0 || makeCol < 0) return null;
-
-  for (let i = hRow + 1; i < json.length; i++) {
-    const row = json[i];
-    const make = String(row[makeCol] || '').trim().toUpperCase();
-    if (!make || make.length === 0) continue;
-    // skip summary rows
-    if (['KOKKU','TOTAL','ZUSAMMEN','SUM'].includes(make)) continue;
-    if (make.toLowerCase() === 'mark' || make.toLowerCase() === 'märk') continue;
-
-    const model = modelCol >= 0 ? String(row[modelCol] || '').trim().toUpperCase() : '';
-    let prodYear = null;
-    if (prodYearCol >= 0) {
-      const py = parseInt(row[prodYearCol]);
-      if (py >= 1950 && py <= new Date().getFullYear() + 1) prodYear = py;
-    }
-
-    let count = 0;
-    if (countCol >= 0 && row[countCol] !== undefined) {
-      count = parseInt(String(row[countCol]).replace(/[\s,]/g, '')) || 0;
-    }
-
-    // If count is 0, try summing all numeric cols after model
-    if (count === 0) {
-      const startCol = Math.max(makeCol, modelCol >= 0 ? modelCol : 0, prodYearCol >= 0 ? prodYearCol : 0) + 1;
-      for (let j = startCol; j < row.length; j++) {
-        const v = parseInt(String(row[j]).replace(/[\s,]/g, '')) || 0;
-        count += v;
-      }
-    }
-
-    if (count > 0 && make) {
-      rows.push({ make, model, prodYear, count });
-    }
-  }
-  return rows;
-}
-
-// ═══════════════════════════════════════════════
-// AUTO FETCH (20th of month)
-// ═══════════════════════════════════════════════
-const FILE_URL_TEMPLATE = (mm, yyyy) =>
-  `https://api.allorigins.win/raw?url=https://www.transpordiamet.ee/sites/default/files/documents/${yyyy}-${String(mm).padStart(2,'0')}/INFOLEHT-${String(mm).padStart(2,'0')}${yyyy}.xlsx`;
-
-// Also try xls
-const FILE_URL_XLS = (mm, yyyy) =>
-  `https://api.allorigins.win/raw?url=https://www.transpordiamet.ee/sites/default/files/documents/${yyyy}-${String(mm).padStart(2,'0')}/INFOLEHT-${String(mm).padStart(2,'0')}${yyyy}.xls`;
-
-async function triggerAutoFetch() {
-  const btn = document.getElementById('fetchBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Fetching…';
-  showPage('sync');
-
-  const now = new Date();
-  // Determine which month to fetch: if day >= 20 fetch current month, else fetch previous
-  let fetchYear = now.getFullYear();
-  let fetchMonth = now.getMonth() + 1; // current month
-  if (now.getDate() < 20) {
-    fetchMonth--;
-    if (fetchMonth === 0) { fetchMonth = 12; fetchYear--; }
-  }
-
-  log('info', `Trying to fetch ${fetchMonth}/${fetchYear} via CORS proxy…`);
+async function fetchData() {
   setProgress(20);
-
-  // Try xlsx first, then xls
-  for (const urlFn of [FILE_URL_TEMPLATE, FILE_URL_XLS]) {
-    const url = urlFn(fetchMonth, fetchYear);
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) { log('warn', `HTTP ${resp.status} for ${url.slice(0,60)}…`); continue; }
-      const buf = await resp.arrayBuffer();
-      if (buf.byteLength < 1000) { log('warn', 'Response too small — likely not a valid file'); continue; }
-      const ext = url.includes('.xls?') || url.endsWith('.xls') ? '.xls' : '.xlsx';
-      const fakeName = `INFOLEHT-${String(fetchMonth).padStart(2,'0')}${fetchYear}${ext}`;
-      const fakeFile = new File([buf], fakeName);
-      setProgress(60);
-      await handleFiles([fakeFile]);
-      log('ok', `Auto-fetch complete: ${fakeName}`);
-      setProgress(100);
-      btn.disabled = false; btn.textContent = '🔄 Fetch Latest';
-      return;
-    } catch(err) {
-      log('warn', `Fetch failed: ${err.message}`);
-    }
+  try {
+    const resp = await fetch('data.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    db.months = data.months || [];
+    db.months.sort((a,b) => a.year*100+a.month - (b.year*100+b.month));
+    setProgress(100);
+    updateSidebarStatus();
+    updateSyncPage();
+    renderOverview();
+  } catch(err) {
+    setProgress(100);
+    console.error('Failed to load data.json:', err);
   }
-
-  log('err', 'Auto-fetch failed. CORS proxy may be unavailable. Please upload manually.');
-  log('info', `Direct download: https://www.transpordiamet.ee/soidukitega-tehtud-toimingute-statistika`);
-  setProgress(100);
-  btn.disabled = false; btn.textContent = '🔄 Fetch Latest';
 }
 
-// Auto-trigger on page load if today is >= 20th
-window.addEventListener('load', () => {
-  const today = new Date();
-  if (today.getDate() >= 20) {
-    const now = today;
-    let fm = now.getMonth() + 1;
-    let fy = now.getFullYear();
-    // Check if we already have this month
-    const already = db.months.find(m => m.month === fm && m.year === fy);
-    if (!already) {
-      log('info', `Today is the ${today.getDate()}th — auto-checking for latest data…`);
-      // silently try in background
-      setTimeout(triggerAutoFetch, 2000);
-    }
-  }
-  updateSidebarStatus();
-  updateSyncPage();
-  renderOverview();
-});
+window.addEventListener('load', fetchData);
 
 // ═══════════════════════════════════════════════
 // OVERVIEW PAGE
@@ -1524,44 +1257,21 @@ function updateSidebarStatus() {
 }
 
 function updateSyncPage() {
-  document.getElementById('loadedCount').textContent = `${db.months.length} FILES`;
+  document.getElementById('loadedCount').textContent = `${db.months.length} MONTHS`;
   const list = document.getElementById('loadedMonthsList');
   if (db.months.length === 0) {
-    list.innerHTML = '<div class="empty" style="padding:32px"><div class="empty-text">No months loaded yet</div></div>';
+    list.innerHTML = '<div class="empty" style="padding:32px"><div class="empty-text">No data available yet</div></div>';
     return;
   }
   list.innerHTML = `<table class="data-table">
-    <thead><tr><th>Month</th><th class="num">Rows</th><th class="num">Total Tx</th><th>Sheet Used</th><th></th></tr></thead>
+    <thead><tr><th>Month</th><th class="num">Rows</th><th class="num">Total Tx</th><th>Sheet</th></tr></thead>
     <tbody>${db.months.map(m=>`<tr>
       <td style="font-weight:600">${m.label}</td>
       <td class="num">${m.rows.length.toLocaleString()}</td>
       <td class="num">${m.rows.reduce((s,r)=>s+r.count,0).toLocaleString()}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${m.sheetUsed||'—'}</td>
-      <td><button class="btn" style="padding:4px 10px;font-size:11px" onclick="removeMonth(${m.year},${m.month})">Remove</button></td>
     </tr>`).join('')}</tbody>
   </table>`;
-}
-
-function removeMonth(year, month) {
-  db.months = db.months.filter(m=>!(m.year===year&&m.month===month));
-  saveDB();
-  updateSidebarStatus();
-  updateSyncPage();
-  renderOverview();
-}
-
-function addChip(filename, label) {
-  const c = document.getElementById('fileChips');
-  const id = `chip-${label.replace(/\s/g,'-')}`;
-  document.getElementById(id)?.remove();
-  const div = document.createElement('div');
-  div.className='chip'; div.id=id;
-  div.innerHTML=`<span class="chip-label">${label}</span><span style="color:var(--muted2)">${filename.length>30?filename.slice(0,28)+'…':filename}</span><span class="chip-remove" onclick="removeChip('${label}','${id}')">×</span>`;
-  c.appendChild(div);
-}
-
-function removeChip(label, id) {
-  document.getElementById(id)?.remove();
 }
 
 // ═══════════════════════════════════════════════
@@ -1574,17 +1284,7 @@ function setProgress(pct) {
   if (pct >= 100) setTimeout(() => { bar.style.opacity='0'; bar.style.width='0%'; }, 500);
 }
 
-function log(type, msg) {
-  const el = document.getElementById('fetchLog');
-  const icons = { ok:'✓', err:'✗', info:'ℹ', warn:'⚠' };
-  const now = new Date().toLocaleTimeString();
-  el.innerHTML += `<span class="log-${type}">${icons[type]}</span> [${now}] ${msg}<br>`;
-  el.scrollTop = el.scrollHeight;
-}
 
-// Init from persisted data
-updateSidebarStatus();
-updateSyncPage();
 </script>
 </body>
 </html>

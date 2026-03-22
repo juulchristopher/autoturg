@@ -32,15 +32,23 @@ def candidate_urls(data_month: int, data_year: int) -> list:
     um = str(upload_month).zfill(2)
 
     urls = []
-    # Primary pattern: folder={upload_year}-{upload_month}, file=INFOLEHT-{MM}{YYYY}
-    for ext in ('.xlsx', '.xls'):
-        urls.append(f"{BASE_URL}/{upload_year}-{um}/INFOLEHT-{mm}{data_year}{ext}")
-    # Alt: folder matches data month
-    for ext in ('.xlsx', '.xls'):
-        urls.append(f"{BASE_URL}/{data_year}-{mm}/INFOLEHT-{mm}{data_year}{ext}")
-    # Alt: with suffix
-    for ext in ('.xlsx', '.xls'):
-        urls.append(f"{BASE_URL}/{upload_year}-{um}/INFOLEHT-{mm}{data_year}_statistika_esmased_ja_uued{ext}")
+    # All known filename patterns
+    suffixes = ['', '_statistika_esmased_ja_uued', '_stat_esm_ja_uued']
+    # All known folder patterns: upload month, or data month
+    folders = [f"{upload_year}-{um}", f"{data_year}-{mm}"]
+
+    for folder in folders:
+        for suffix in suffixes:
+            for ext in ('.xlsx', '.xls'):
+                urls.append(f"{BASE_URL}/{folder}/INFOLEHT-{mm}{data_year}{suffix}{ext}")
+        # URL-encoded pattern: "Infoleht MM-YYYY (esmaste ja uute sõidukite statistika).xls"
+        encoded_name = f"Infoleht%20{mm}-{data_year}%20%28esmaste%20ja%20uute%20s%C3%B5idukite%20statistika%29.xls"
+        urls.append(f"{BASE_URL}/{folder}/{encoded_name}")
+    # Also try with _0 suffix (seen for Jun 2024)
+    for folder in folders:
+        for ext in ('.xlsx', '.xls'):
+            urls.append(f"{BASE_URL}/{folder}/INFOLEHT-{mm}{data_year}_statistika_esmased_ja_uued_0{ext}")
+
     return urls
 
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Fetch the latest Transpordiamet infoleht xlsx and parse järelturg data into data.json.
+Fetch the latest Transpordiamet infoleht xlsx and parse all 3 market categories
+(järelturg, new cars, imports) into data.json.
 Merges new month into existing data.json so history accumulates.
 """
 
@@ -17,6 +18,13 @@ BASE_URL = "https://www.transpordiamet.ee/sites/default/files/documents"
 DATA_FILE = Path(__file__).resolve().parent / "data.json"
 
 SKIP_MAKES = {'KOKKU', 'TOTAL', 'ZUSAMMEN', 'SUM', 'MARK', 'MÄRK'}
+
+# Sheet detection keywords per category
+SHEET_KEYWORDS = {
+    'jarelturg': ('järelturg', 'jarelturg', 'omaniku', 'owner', 'used', 'kasutatud'),
+    'newCars':   ('esmane', 'esmased', 'uued', 'uus', 'new', 'first registration', 'esmas'),
+    'imports':   ('import', 'sisseveo', 'sissetoo'),
+}
 
 
 def candidate_urls(data_month: int, data_year: int) -> list:
@@ -58,25 +66,34 @@ def download(url: str) -> bytes:
         return resp.read()
 
 
-def find_jarelturg_sheet(wb: openpyxl.Workbook):
-    """Return the worksheet that contains järelturg / used-car data."""
+def find_sheet_by_category(wb, category: str):
+    """Return the worksheet matching the given category keywords.
+    Returns None if not found."""
+    keywords = SHEET_KEYWORDS[category]
     priority = []
     rest = []
     for name in wb.sheetnames:
         lo = name.lower()
-        if any(k in lo for k in ('järelturg', 'jarelturg', 'omaniku', 'owner', 'used', 'kasutatud')):
+        if any(k in lo for k in keywords):
             priority.append(name)
         else:
             rest.append(name)
-    for name in priority + rest:
+
+    for name in priority:
         ws = wb[name]
         if ws.max_row and ws.max_row >= 3:
+            # Verify it has a header with make column
             for row in ws.iter_rows(min_row=1, max_row=min(25, ws.max_row), values_only=False):
                 for cell in row:
                     val = str(cell.value or '').lower().strip()
                     if val in ('mark', 'märk', 'make'):
                         return ws
     return None
+
+
+def find_jarelturg_sheet(wb):
+    """Legacy wrapper — find järelturg sheet."""
+    return find_sheet_by_category(wb, 'jarelturg')
 
 
 # Model names where the first word alone is ambiguous and needs the second word
@@ -99,7 +116,8 @@ def split_model_variant(full_model: str) -> tuple:
 
 
 def parse_sheet(ws) -> list:
-    """Parse a järelturg worksheet into rows of {make, model, variant, fullModel, prodYear, count}."""
+    """Parse a worksheet into rows of {make, model, variant, fullModel, prodYear, count}.
+    Works for all 3 categories since column structure is the same."""
     rows_out = []
     header_row = None
     make_col = model_col = prod_col = count_col = None
@@ -111,7 +129,6 @@ def parse_sheet(ws) -> list:
             header_row = ri
             make_col = mk_idx
             model_col = next((i for i, c in enumerate(cells) if i != mk_idx and (c in ('mudel', 'model') or 'mudel' in c)), None)
-            # Don't guess model_col — leave None if not found (old format has no model column)
             prod_col = next((i for i, c in enumerate(cells) if 'aasta' in c or c == 'year' or 'tootmis' in c or 'esm reg' in c), None)
             count_col = next((i for i, c in enumerate(cells) if c in ('arv', 'kokku', 'hulk', 'transactions') or 'count' in c), None)
             if count_col is None:
@@ -165,18 +182,54 @@ def parse_sheet(ws) -> list:
 def load_data() -> dict:
     if DATA_FILE.exists():
         with open(DATA_FILE) as f:
-            return json.load(f)
-    return {"months": []}
+            data = json.load(f)
+        # Migrate old format: { months: [] } → { jarelturg: [], newCars: [], imports: [] }
+        if "months" in data and "jarelturg" not in data:
+            print("  Migrating old data format to multi-category...")
+            return {
+                "jarelturg": data["months"],
+                "newCars": [],
+                "imports": [],
+            }
+        # Ensure all keys exist
+        data.setdefault("jarelturg", [])
+        data.setdefault("newCars", [])
+        data.setdefault("imports", [])
+        return data
+    return {"jarelturg": [], "newCars": [], "imports": []}
 
 
 def save_data(data: dict):
-    data["months"].sort(key=lambda m: m["year"] * 100 + m["month"])
+    for key in ('jarelturg', 'newCars', 'imports'):
+        data[key].sort(key=lambda m: m["year"] * 100 + m["month"])
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def open_workbook(tmp_path, is_xls: bool):
+    """Open an xlsx or xls file and return an openpyxl Workbook."""
+    if is_xls:
+        try:
+            import xlrd
+            xls_wb = xlrd.open_workbook(str(tmp_path))
+            from openpyxl import Workbook
+            wb = Workbook()
+            for si, sheet in enumerate(xls_wb.sheets()):
+                ws = wb.active if si == 0 else wb.create_sheet()
+                ws.title = sheet.name
+                for r in range(sheet.nrows):
+                    for c in range(sheet.ncols):
+                        ws.cell(row=r+1, column=c+1, value=sheet.cell_value(r, c))
+            return wb
+        except ImportError:
+            print("  xlrd not installed, cannot read .xls files")
+            return None
+    else:
+        return openpyxl.load_workbook(tmp_path, read_only=True, data_only=True)
+
+
 def fetch_month(month: int, year: int) -> bool:
-    """Try to fetch and parse a single month. Returns True on success."""
+    """Try to fetch and parse a single month (all 3 categories). Returns True if any category succeeded."""
     print(f"Fetching infoleht for {MONTHS_EN[month-1]} {year}...")
     urls = candidate_urls(month, year)
 
@@ -203,53 +256,48 @@ def fetch_month(month: int, year: int) -> bool:
     tmp.write_bytes(raw)
 
     try:
-        if is_xls:
-            # openpyxl can't read .xls — use xlrd via a temp conversion
-            try:
-                import xlrd
-                xls_wb = xlrd.open_workbook(str(tmp))
-                # Convert to xlsx in memory
-                from openpyxl import Workbook
-                wb = Workbook()
-                for si, sheet in enumerate(xls_wb.sheets()):
-                    ws = wb.active if si == 0 else wb.create_sheet()
-                    ws.title = sheet.name
-                    for r in range(sheet.nrows):
-                        for c in range(sheet.ncols):
-                            ws.cell(row=r+1, column=c+1, value=sheet.cell_value(r, c))
-            except ImportError:
-                print("  xlrd not installed, cannot read .xls files")
-                return False
-        else:
-            wb = openpyxl.load_workbook(tmp, read_only=True, data_only=True)
-
-        ws = find_jarelturg_sheet(wb)
-        if ws is None:
-            print(f"  No järelturg sheet found in {wb.sheetnames}")
+        wb = open_workbook(tmp, is_xls)
+        if wb is None:
             return False
 
-        rows = parse_sheet(ws)
+        print(f"  Sheets found: {wb.sheetnames}")
+        data = load_data()
+        any_success = False
+
+        # Parse all 3 categories from the same workbook
+        for category, data_key in [('jarelturg', 'jarelturg'), ('newCars', 'newCars'), ('imports', 'imports')]:
+            ws = find_sheet_by_category(wb, category)
+            if ws is None:
+                print(f"  No {category} sheet found")
+                continue
+
+            rows = parse_sheet(ws)
+            if not rows:
+                print(f"  No data rows for {category} in sheet '{ws.title}'")
+                continue
+
+            print(f"  {category}: parsed {len(rows)} rows from sheet '{ws.title}'")
+
+            # Upsert: remove existing month, add new
+            data[data_key] = [m for m in data[data_key] if not (m["year"] == year and m["month"] == month)]
+            data[data_key].append({
+                "year": year,
+                "month": month,
+                "label": f"{MONTHS_EN[month-1]} {year}",
+                "sheetUsed": ws.title,
+                "rows": rows,
+            })
+            any_success = True
+
+        if any_success:
+            save_data(data)
+            counts = {k: len(data[k]) for k in ('jarelturg', 'newCars', 'imports')}
+            print(f"  Saved to {DATA_FILE} (jarelturg: {counts['jarelturg']}, newCars: {counts['newCars']}, imports: {counts['imports']} months)")
+
         if hasattr(wb, 'close'):
             wb.close()
 
-        if not rows:
-            print("  No data rows parsed")
-            return False
-
-        print(f"  Parsed {len(rows)} rows from sheet '{ws.title}'")
-
-        data = load_data()
-        data["months"] = [m for m in data["months"] if not (m["year"] == year and m["month"] == month)]
-        data["months"].append({
-            "year": year,
-            "month": month,
-            "label": f"{MONTHS_EN[month-1]} {year}",
-            "sheetUsed": ws.title,
-            "rows": rows,
-        })
-        save_data(data)
-        print(f"  Saved to {DATA_FILE} ({len(data['months'])} months total)")
-        return True
+        return any_success
 
     finally:
         tmp.unlink(missing_ok=True)

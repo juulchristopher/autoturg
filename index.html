@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🇪🇪 Järelturg — Estonian Used Car Market</title>
+<title>🇪🇪 Autoturg — Estonian Vehicle Market</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
@@ -641,23 +641,39 @@ body {
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="logo-flag">🇪🇪</div>
-      <div class="logo-title">Järelturg Monitor</div>
-      <div class="logo-sub">EE Used Car Market</div>
+      <div class="logo-title">Autoturg Monitor</div>
+      <div class="logo-sub">Estonian Vehicle Market</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Category</div>
+      <button class="nav-btn cat-btn active" data-cat="jarelturg" onclick="switchCategory('jarelturg')">
+        <span class="nav-icon">🔄</span> Järelturg
+      </button>
+      <button class="nav-btn cat-btn" data-cat="newCars" onclick="switchCategory('newCars')">
+        <span class="nav-icon">🆕</span> Uued sõidukid
+      </button>
+      <button class="nav-btn cat-btn" data-cat="imports" onclick="switchCategory('imports')">
+        <span class="nav-icon">📦</span> Import
+      </button>
+      <button class="nav-btn cat-btn" data-cat="koguTurg" onclick="switchCategory('koguTurg')">
+        <span class="nav-icon">🌐</span> Kogu turg
+      </button>
     </div>
 
     <div class="nav-section">
       <div class="nav-section-label">Views</div>
-      <button class="nav-btn active" onclick="showPage('overview')">
+      <button class="nav-btn view-btn active" onclick="showPage('overview')">
         <span class="nav-icon">📊</span> Monthly Overview
       </button>
-      <button class="nav-btn" onclick="showPage('comparison')">
+      <button class="nav-btn view-btn" onclick="showPage('comparison')">
         <span class="nav-icon">⚖️</span> Model Comparison
       </button>
     </div>
 
     <div class="nav-section">
       <div class="nav-section-label">Data</div>
-      <button class="nav-btn" onclick="showPage('sync')">
+      <button class="nav-btn view-btn" onclick="showPage('sync')">
         <span class="nav-icon">🔄</span> Sync & Upload
       </button>
     </div>
@@ -709,8 +725,8 @@ body {
 
           <div class="charts-grid">
             <div class="card full">
-              <div class="card-title">Top 5 Makes — Monthly Transaction Volume</div>
-              <div class="card-desc">JÄRELTURG · OWNER CHANGE REGISTRATIONS PER MONTH</div>
+              <div class="card-title" id="overviewLineTitle">Top 5 Makes — Monthly Transaction Volume</div>
+              <div class="card-desc" id="overviewLineDesc">JÄRELTURG · OWNER CHANGE REGISTRATIONS PER MONTH</div>
               <div class="chart-wrap h300">
                 <canvas id="chartOverviewLine"></canvas>
               </div>
@@ -858,7 +874,8 @@ body {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let db = { months: [] };
+let db = { jarelturg: [], newCars: [], imports: [] };
+let activeCategory = 'jarelturg';
 let charts = {};
 
 // Comparison slots: up to 5 {make, model}
@@ -884,8 +901,25 @@ let timelineTo = null;   // {year, month} or null = latest
 
 function monthKey(m) { return m.year * 100 + m.month; }
 
+function activeMonths() {
+  if (activeCategory === 'koguTurg') {
+    // Merge all categories: union of months, concatenating rows
+    const merged = {};
+    for (const cat of ['jarelturg', 'newCars', 'imports']) {
+      for (const m of (db[cat] || [])) {
+        const key = m.year * 100 + m.month;
+        if (!merged[key]) merged[key] = { year: m.year, month: m.month, label: m.label, sheetUsed: 'Combined', rows: [], _categories: {} };
+        merged[key].rows = merged[key].rows.concat(m.rows);
+        merged[key]._categories[cat] = m.rows;
+      }
+    }
+    return Object.values(merged).sort((a,b) => monthKey(a) - monthKey(b));
+  }
+  return db[activeCategory] || [];
+}
+
 function filteredMonths() {
-  let months = db.months;
+  let months = activeMonths();
   if (timelineFrom) months = months.filter(m => monthKey(m) >= monthKey(timelineFrom));
   if (timelineTo) months = months.filter(m => monthKey(m) <= monthKey(timelineTo));
   return months;
@@ -893,12 +927,13 @@ function filteredMonths() {
 
 function buildTimelineSelects() {
   const bar = document.getElementById('timelineBar');
-  if (db.months.length === 0) { bar.style.display = 'none'; return; }
+  const am = activeMonths();
+  if (am.length === 0) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
 
   const fromSel = document.getElementById('timelineFrom');
   const toSel = document.getElementById('timelineTo');
-  const sorted = [...db.months].sort((a,b) => monthKey(a) - monthKey(b));
+  const sorted = [...am].sort((a,b) => monthKey(a) - monthKey(b));
 
   const opts = sorted.map(m => `<option value="${m.year}-${m.month}">${m.label}</option>`).join('');
   fromSel.innerHTML = opts;
@@ -931,7 +966,7 @@ function applyTimeline() {
 function resetTimeline() {
   timelineFrom = null;
   timelineTo = null;
-  const sorted = [...db.months].sort((a,b) => monthKey(a) - monthKey(b));
+  const sorted = [...activeMonths()].sort((a,b) => monthKey(a) - monthKey(b));
   if (sorted.length) {
     document.getElementById('timelineFrom').value = `${sorted[0].year}-${sorted[0].month}`;
     document.getElementById('timelineTo').value = `${sorted[sorted.length-1].year}-${sorted[sorted.length-1].month}`;
@@ -948,21 +983,68 @@ function renderCurrentPage() {
 // ═══════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════
-const pageTitles = {
-  overview: ['Monthly Overview', 'Top 5 makes · järelturg transactions'],
-  comparison: ['Model Comparison', 'Up to 5 models · transactions & production year'],
-  sync: ['Data Status', 'Auto-updated järelturg data from Transpordiamet'],
+const CATEGORY_LABELS = {
+  jarelturg: 'Järelturg',
+  newCars: 'Uued sõidukid',
+  imports: 'Import',
+  koguTurg: 'Kogu turg',
 };
+
+const CATEGORY_DESC = {
+  jarelturg: 'OWNER CHANGE REGISTRATIONS PER MONTH',
+  newCars: 'NEW VEHICLE REGISTRATIONS PER MONTH',
+  imports: 'IMPORTED VEHICLE REGISTRATIONS PER MONTH',
+  koguTurg: 'ALL CATEGORIES COMBINED PER MONTH',
+};
+
+function pageTitlesForCategory() {
+  const cat = CATEGORY_LABELS[activeCategory];
+  return {
+    overview: ['Monthly Overview', `Top 5 makes · ${cat} transactions`],
+    comparison: ['Model Comparison', `Up to 5 models · ${cat} · transactions & production year`],
+    sync: ['Data Status', `Auto-updated data from Transpordiamet`],
+  };
+}
+
+function switchCategory(cat) {
+  activeCategory = cat;
+  // Update category buttons
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  // Reset timeline for new category
+  timelineFrom = null;
+  timelineTo = null;
+  buildTimelineSelects();
+  // Reset comparison slots
+  slots = [null, null, null, null, null];
+  // Update page title
+  const active = document.querySelector('.page.active');
+  const pageId = active?.id?.replace('page-', '') || 'overview';
+  const titles = pageTitlesForCategory();
+  const [t, s] = titles[pageId];
+  document.getElementById('pageTitle').textContent = t;
+  document.getElementById('pageSub').textContent = s;
+  // Update overview descriptions
+  const catDesc = CATEGORY_DESC[activeCategory];
+  const lineDesc = document.getElementById('overviewLineDesc');
+  if (lineDesc) lineDesc.textContent = catDesc;
+  // Re-render
+  updateSidebarStatus();
+  updateSyncPage();
+  renderCurrentPage();
+}
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${id}`).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b => {
+  document.querySelectorAll('.view-btn').forEach(b => {
     if (b.textContent.toLowerCase().includes(id === 'sync' ? 'sync' : id === 'comparison' ? 'comparison' : 'overview'))
       b.classList.add('active');
   });
-  const [t, s] = pageTitles[id];
+  const titles = pageTitlesForCategory();
+  const [t, s] = titles[id];
   document.getElementById('pageTitle').textContent = t;
   document.getElementById('pageSub').textContent = s;
   if (id === 'overview') renderOverview();
@@ -978,8 +1060,21 @@ async function fetchData() {
     const resp = await fetch('data.json');
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    db.months = data.months || [];
-    db.months.sort((a,b) => a.year*100+a.month - (b.year*100+b.month));
+    // Support both old {months:[]} and new {jarelturg:[], newCars:[], imports:[]} format
+    if (data.months && !data.jarelturg) {
+      // Legacy format: migrate
+      db.jarelturg = data.months;
+      db.newCars = [];
+      db.imports = [];
+    } else {
+      db.jarelturg = data.jarelturg || [];
+      db.newCars = data.newCars || [];
+      db.imports = data.imports || [];
+    }
+    const sortFn = (a,b) => a.year*100+a.month - (b.year*100+b.month);
+    db.jarelturg.sort(sortFn);
+    db.newCars.sort(sortFn);
+    db.imports.sort(sortFn);
     setProgress(100);
     buildTimelineSelects();
     updateSidebarStatus();
@@ -1017,7 +1112,7 @@ function renderOverview() {
     <div class="stat-pill"><div class="stat-pill-accent"></div>
       <div class="stat-pill-label">Total Transactions</div>
       <div class="stat-pill-value">${total.toLocaleString()}</div>
-      <div class="stat-pill-sub">${months.length} months · järelturg</div>
+      <div class="stat-pill-sub">${months.length} months · ${CATEGORY_LABELS[activeCategory]}</div>
     </div>
     <div class="stat-pill"><div class="stat-pill-accent"></div>
       <div class="stat-pill-label">Top Make</div>
@@ -1032,7 +1127,7 @@ function renderOverview() {
     <div class="stat-pill"><div class="stat-pill-accent"></div>
       <div class="stat-pill-label">Unique Makes</div>
       <div class="stat-pill-value">${Object.keys(makeMap).length}</div>
-      <div class="stat-pill-sub">brands in järelturg</div>
+      <div class="stat-pill-sub">brands in ${CATEGORY_LABELS[activeCategory]}</div>
     </div>`;
 
   // Line chart: top 5 over months
@@ -1082,23 +1177,52 @@ function renderOverview() {
     }
   });
 
-  // Total monthly bar
+  // Total monthly bar (stacked by category in koguTurg mode)
   destroyChart('chartOverviewTotal');
   const ctx3 = document.getElementById('chartOverviewTotal').getContext('2d');
-  const totals = months.map(m=>m.rows.reduce((s,r)=>s+r.count,0));
-  charts['chartOverviewTotal'] = new Chart(ctx3, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets:[{
-        data: totals,
-        backgroundColor: 'rgba(200,150,10,0.15)',
-        borderColor: '#c8960a',
-        borderWidth: 1, borderRadius: 4,
-      }]
-    },
-    options: chartOpts({ yLabel:'Transactions', showLegend:false })
-  });
+
+  if (activeCategory === 'koguTurg') {
+    // Stacked bar chart by category
+    const catColors = { jarelturg: '#c8960a', newCars: '#2563eb', imports: '#16a34a' };
+    const catLabelsMap = { jarelturg: 'Järelturg', newCars: 'Uued sõidukid', imports: 'Import' };
+    const datasets = ['jarelturg', 'newCars', 'imports'].map(cat => ({
+      label: catLabelsMap[cat],
+      data: months.map(m => {
+        const catRows = m._categories?.[cat] || [];
+        return catRows.reduce((s,r)=>s+r.count,0);
+      }),
+      backgroundColor: catColors[cat] + '99',
+      borderColor: catColors[cat],
+      borderWidth: 1, borderRadius: 2,
+    }));
+    charts['chartOverviewTotal'] = new Chart(ctx3, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        ...chartOpts({ yLabel:'Transactions', showLegend:true }),
+        scales: {
+          ...chartOpts({ yLabel:'Transactions' }).scales,
+          x: { ...chartOpts({}).scales.x, stacked: true },
+          y: { ...chartOpts({ yLabel:'Transactions' }).scales.y, stacked: true },
+        }
+      }
+    });
+  } else {
+    const totals = months.map(m=>m.rows.reduce((s,r)=>s+r.count,0));
+    charts['chartOverviewTotal'] = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets:[{
+          data: totals,
+          backgroundColor: 'rgba(200,150,10,0.15)',
+          borderColor: '#c8960a',
+          borderWidth: 1, borderRadius: 4,
+        }]
+      },
+      options: chartOpts({ yLabel:'Transactions', showLegend:false })
+    });
+  }
 
   // Table
   const tbody = document.getElementById('overviewTableBody');
@@ -1519,22 +1643,25 @@ function updateSidebarStatus() {
   const dot = document.getElementById('syncDot');
   const txt = document.getElementById('syncStatusText');
   const cnt = document.getElementById('syncMonthCount');
-  const n = db.months.length;
-  if (n === 0) { dot.className='sync-dot'; txt.textContent='No data'; }
+  const am = activeMonths();
+  const n = am.length;
+  const totalAll = db.jarelturg.length + db.newCars.length + db.imports.length;
+  if (totalAll === 0) { dot.className='sync-dot'; txt.textContent='No data'; }
   else { dot.className='sync-dot ok'; txt.textContent='Data loaded'; }
-  cnt.textContent = `${n} month${n!==1?'s':''} loaded`;
+  cnt.textContent = `${CATEGORY_LABELS[activeCategory]}: ${n} month${n!==1?'s':''}`;
 }
 
 function updateSyncPage() {
-  document.getElementById('loadedCount').textContent = `${db.months.length} MONTHS`;
+  const am = activeMonths();
+  document.getElementById('loadedCount').textContent = `${am.length} MONTHS · ${CATEGORY_LABELS[activeCategory].toUpperCase()}`;
   const list = document.getElementById('loadedMonthsList');
-  if (db.months.length === 0) {
-    list.innerHTML = '<div class="empty" style="padding:32px"><div class="empty-text">No data available yet</div></div>';
+  if (am.length === 0) {
+    list.innerHTML = '<div class="empty" style="padding:32px"><div class="empty-text">No data for this category yet</div></div>';
     return;
   }
   list.innerHTML = `<table class="data-table">
     <thead><tr><th>Month</th><th class="num">Rows</th><th class="num">Total Tx</th><th>Sheet</th></tr></thead>
-    <tbody>${db.months.map(m=>`<tr>
+    <tbody>${am.map(m=>`<tr>
       <td style="font-weight:600">${m.label}</td>
       <td class="num">${m.rows.length.toLocaleString()}</td>
       <td class="num">${m.rows.reduce((s,r)=>s+r.count,0).toLocaleString()}</td>

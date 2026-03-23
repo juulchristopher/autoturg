@@ -1,4 +1,4 @@
-name: Update järelturg data
+name: Update market data
 
 on:
   schedule:
@@ -18,7 +18,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install openpyxl
+        run: pip install openpyxl xlrd
 
       - name: Fetch and parse latest infoleht
         run: python parse.py
@@ -31,6 +31,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to data.json"
           else
-            git commit -m "Update järelturg data ($(date +%Y-%m))"
+            git commit -m "Update market data ($(date +%Y-%m))"
             git push
           fi

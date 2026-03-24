@@ -2,7 +2,7 @@
 
 > Phased delivery roadmap with milestones and dependencies.
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-03-25
 
 ---
 
@@ -20,22 +20,22 @@ gantt
     GitHub Actions monthly cron         :done, p0c, 2026-03-15, 2026-03-20
     Model comparison (5 slots)          :done, p0d, 2026-03-20, 2026-03-23
 
-    section Phase 1: Expand Data Sources
-    Parse new-car registration sheet    :p1a, 2026-04-01, 7d
-    Parse import registration sheet     :p1b, after p1a, 7d
-    Update data.json schema             :p1c, after p1a, 3d
-    UI: category tabs & navigation      :p1d, after p1c, 7d
-    Combined cross-category overview    :p1e, after p1d, 3d
-    Milestone: 3 categories live        :milestone, p1m, after p1e, 0d
+    section Phase 1: Expand Data Sources ✓
+    Parse new-car registration sheet    :done, p1a, 2026-03-24, 1d
+    Multi-category data.json schema     :done, p1c, 2026-03-24, 1d
+    UI: category tabs & navigation      :done, p1d, 2026-03-24, 1d
+    Combined cross-category overview    :done, p1e, 2026-03-24, 1d
 
-    section Phase 2: Vehicle Lookup
-    Open Data Portal API integration    :p2a, after p1m, 10d
-    Contact Transpordiamet for ATV creds:crit, p2b, after p1m, 14d
-    VIN decode logic                    :p2c, after p2a, 5d
-    Registration number lookup          :p2d, after p2b, 7d
-    Vehicle detail panel UI             :p2e, after p2c, 7d
-    Input UI: VIN / reg / selector      :p2f, after p2e, 5d
-    Milestone: vehicle lookup live      :milestone, p2m, after p2f, 0d
+    section Phase 2: API Integration & Data Pipeline
+    andmed.eesti.ee API integration     :p2a, 2026-03-26, 7d
+    Statistikaamet API (TS322)          :p2b, after p2a, 5d
+    Replace URL-guessing with API fetch :p2c, after p2a, 3d
+    VIN decode logic (client-side)      :p2d, after p2a, 5d
+    mntstat.ee vehicle scraper          :p2e, after p2d, 7d
+    Vehicle detail panel UI             :p2f, after p2d, 7d
+    Input UI: VIN / reg / selector      :p2g, after p2f, 5d
+    Apply for AVP access                :crit, p2h, 2026-03-26, 21d
+    Milestone: API + lookup live        :milestone, p2m, after p2g, 0d
 
     section Phase 3: Pricing Intelligence
     mobile.de API integration           :p3a, after p2m, 14d
@@ -76,61 +76,60 @@ gantt
 
 ---
 
-## Phase 1: Expand Data Sources
+## Phase 1: Expand Data Sources (DONE)
 
 **Objective:** Cover all 3 market categories — new cars, imports, and järelturg.
 
-**Prerequisites:** Phase 0 complete.
-
-**Tasks:**
-1. Extend `parse.py` to extract new-car registration sheets from infoleht files
-2. Extend `parse.py` to extract import registration sheets
-3. Update `data.json` schema from flat `months[]` to `{ jarelturg[], newCars[], imports[] }`
-4. Add category tabs/navigation to the frontend
-5. Build combined overview dashboard showing all 3 categories
+**Completed:** 2026-03-24 (Sprint 1)
 
 **Deliverables:**
-- [ ] parse.py handles 3 sheet types from infoleht files
-- [ ] data.json contains all 3 categories
-- [ ] UI shows separate views per category + combined overview
-- [ ] GitHub Actions pipeline updated to process all sheets
+- [x] parse.py refactored with `find_sheet_by_category()` and `SHEET_KEYWORDS` dict
+- [x] data.json schema changed to `{ jarelturg[], newCars[], imports[] }`
+- [x] 26 months järelturg + 26 months newCars data populated
+- [x] UI: sidebar category buttons (Järelturg, Uued sõidukid, Import, Kogu turg)
+- [x] Combined "Kogu turg" view with stacked bar chart
+- [x] GitHub Actions pipeline updated for all categories
 
-**Risks:**
-- Infoleht sheet naming may vary across months — need robust sheet detection
-- Data volume triples — monitor data.json file size
+**Notes:**
+- Import sheets not found in infoleht files — imports array stays empty. Import data needs alternative source.
+- New cars parsed from "Sõidu-uus" sheet via keyword matching on "uus"/"uued"
+- Auto-migration from old `{ months[] }` format to new schema in both Python and JS
 
-**Definition of Done:** All 3 categories display correct data for all 26+ historical months. Combined overview shows cross-category comparisons.
-
-**References:** FR-004, FR-005, US-16, US-17, US-18
+**References:** FR-004 (DONE), FR-005 (Blocked), US-16, US-17, US-18
 
 ---
 
-## Phase 2: Vehicle Lookup
+## Phase 2: API Integration & Data Pipeline
 
-**Objective:** Enable users to look up a specific vehicle by VIN or registration number and see market context.
+**Objective:** Replace URL-guessing with proper API access, add vehicle lookup via VIN/registration number.
 
-**Prerequisites:** Phase 1 complete. ATV API credentials obtained (critical path).
+**Prerequisites:** Phase 1 complete.
 
 **Tasks:**
-1. Integrate Estonian Open Data Portal API (free, no auth needed)
-2. Apply for and obtain ATV API credentials from Transpordiamet
-3. Build VIN decode logic (extract make, model, year from VIN)
-4. Build registration number lookup via ATV API
-5. Create vehicle detail panel in UI showing specs + market context
-6. Build input UI: make/model selector, VIN field, registration number field
+1. Integrate andmed.eesti.ee OpenData API for programmatic infoleht access
+2. Integrate Statistikaamet API (andmed.stat.ee) for TS322 first-registration data
+3. Replace URL candidate guessing in parse.py with API-driven data fetching
+4. Build client-side VIN decode (WMI → make, VDS → model/year)
+5. Build mntstat.ee scraper for vehicle details by registration number
+6. Create vehicle detail panel in UI showing specs + market context
+7. Build input UI: make/model selector, VIN field, registration number field
+8. Apply for AVP access from Transpordiamet (critical path, long lead time)
 
 **Deliverables:**
-- [ ] VIN input decodes and returns vehicle details
-- [ ] Registration number input returns vehicle details
+- [ ] parse.py fetches infoleht data via andmed.eesti.ee API instead of URL guessing
+- [ ] Statistikaamet TS322 data integrated for first-registration statistics
+- [ ] VIN input decodes make, model, year client-side
+- [ ] mntstat.ee scraper returns vehicle specs by registration number
 - [ ] Vehicle detail panel shows specs + transaction history + market position
 - [ ] Input method switcher (dropdown, VIN, reg number)
 
 **Risks:**
-- ATV API credential application may take weeks — start early
-- API may have rate limits that constrain lookup frequency
-- Fallback: use Open Data Portal if ATV API unavailable
+- andmed.eesti.ee API may require registration for API key
+- mntstat.ee scraping may break if site layout changes — need resilient selectors
+- AVP application takes weeks — scraping is the interim fallback
+- Rate limits on mntstat.ee unknown
 
-**Definition of Done:** User can enter a VIN or registration number and see vehicle details plus market context (transaction volume for that make/model, pricing if available).
+**Definition of Done:** Data pipeline uses APIs instead of URL guessing. User can enter a VIN or registration number and see vehicle details plus market context.
 
 **References:** FR-006, FR-010, FR-011, FR-015, FR-016, US-13, US-14, US-15
 

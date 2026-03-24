@@ -2,7 +2,7 @@
 
 > All data models, storage formats, and normalization rules.
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-03-25
 
 ---
 
@@ -12,7 +12,9 @@
 
 ```json
 {
-  "months": [ MonthEntry, ... ]
+  "jarelturg": [ MonthEntry, ... ],
+  "newCars":   [ MonthEntry, ... ],
+  "imports":   [ MonthEntry, ... ]
 }
 ```
 

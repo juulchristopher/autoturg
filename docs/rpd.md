@@ -62,14 +62,14 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 | FR-001 | Display monthly transaction volume by make | P0 | DONE |
 | FR-002 | Compare up to 5 make/model/variant combinations | P0 | DONE |
 | FR-003 | Show production year distribution for selected models | P0 | DONE |
-| FR-004 | Ingest new-car registration data from Transpordiamet infoleht | P1 | Planned |
-| FR-005 | Ingest import registration data from Transpordiamet infoleht | P1 | Planned |
-| FR-006 | Integrate Estonian Open Data Portal API for vehicle registry data | P2 | Planned |
+| FR-004 | Ingest new-car registration data from Transpordiamet infoleht | P1 | DONE |
+| FR-005 | Ingest import registration data from Transpordiamet infoleht | P1 | Blocked — infoleht has no import sheet |
+| FR-006 | Integrate Estonian Open Data Portal API for infoleht data | P2 | Planned |
 | FR-007 | Integrate mobile.de API for European market pricing | P3 | Planned |
 | FR-008 | Integrate AutoScout24 API for European market pricing | P3 | Planned |
 | FR-009 | Collect auto24.ee listing data for Estonian local pricing | P3 | Planned |
 | FR-010 | VIN decode and vehicle lookup | P2 | Planned |
-| FR-011 | Registration number lookup via ATV API | P2 | Planned |
+| FR-011 | Registration number lookup via AVP/mntstat.ee | P2 | Planned |
 | FR-012 | Generate depreciation curves from historical pricing data | P4 | Planned |
 | FR-013 | Price range visualization (box plots or similar) | P3 | Planned |
 | FR-014 | Make/model/variant selector input | P0 | DONE |
@@ -96,8 +96,10 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 | Source | URL | Auth | Data Provided | Status |
 |--------|-----|------|---------------|--------|
 | Transpordiamet infoleht | transpordiamet.ee | Public download | Monthly registrations (new, import, jarelturg) by make/model/year | Active (jarelturg only) |
-| Transpordiamet ATV API | abi.ria.ee/teabevarav/ | Credential-based | Vehicle registry, VIN lookup, registration lookup | Need credentials |
-| Estonian Open Data Portal | andmed.eesti.ee | None (public) | Vehicle statistics, registration data | Ready to integrate |
+| Transpordiamet AVP | transpordiamet.ee (X-tee) | Formal application + €15/mo | Vehicle registry, VIN lookup, reg lookup (XML) | Need to apply |
+| Estonian Open Data Portal | andmed.eesti.ee | API key (free) | Infoleht datasets, vehicle statistics | Ready to integrate |
+| mntstat.ee | mntstat.ee | None (public web) | 829K vehicle records, reg search, specs | Web scraping |
+| Statistikaamet API | andmed.stat.ee | None (public) | TS322: first registrations by month | Ready to integrate |
 | mobile.de | services.mobile.de | HTTP Basic | Vehicle listings with prices (German/EU market) | Need API account |
 | AutoScout24 | listing-creation.api.autoscout24.com | OAuth | Vehicle listings with prices (EU market) | Need API account |
 | auto24.ee | auto24.ee | None (no API) | Estonian vehicle listings with prices | Scraping or partnership |
@@ -133,7 +135,8 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| ATV API credentials require formal application | Blocks FR-010, FR-011 | Contact Transpordiamet early; use Open Data Portal as fallback |
+| AVP access requires formal application + €15/mo | Blocks FR-011 | Apply to transpordiamet@transpordiamet.ee; use mntstat.ee scraping as fallback |
+| Infoleht has no dedicated import sheet | FR-005 blocked | Import data may need different source or manual identification of import-related sheets |
 | auto24.ee / autoportaal.ee have no public API | Blocks FR-009 Estonian pricing | Explore partnership; scraping may violate ToS |
 | mobile.de API requires separate account approval | Delays FR-007 | Apply early; AutoScout24 as backup |
 | CORS restrictions on client-side API calls | Blocks direct browser-to-API calls | Use serverless proxy (Cloudflare Workers) or server-side pipeline |

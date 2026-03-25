@@ -4,7 +4,7 @@
 
 **Live:** https://juulchristopher.github.io/autoturg
 **Repo:** github.com/juulchristopher/autoturg
-**Last updated:** 2026-03-24
+**Last updated:** 2026-03-26
 
 ---
 
@@ -35,25 +35,29 @@ Autoturg covers the full spectrum of the Estonian car market:
 
 Pricing data is supplemented from marketplace platforms: mobile.de, AutoScout24, auto24.ee, and autoportaal.ee.
 
-## Current Capabilities (v1)
+## Current Capabilities (v2)
 
 What's built and live today:
 
 - **Monthly Overview Dashboard** — Top 5 makes trend line, market share donut, total transaction bar chart, sortable make table
-- **Model Comparison** — Compare up to 5 make/model/variant combinations with monthly volume and production year charts
+- **Model Comparison** — Compare up to 5 make/model/configuration combinations with searchable 3-field combobox (Maker → Model → Configuration)
+- **3 Market Categories** — Järelturg (aftermarket), Uued sõidukid (new cars), and Kogu turg (combined cross-category view with stacked bar charts)
+- **Vehicle Lookup** — VIN decode (client-side, 70+ WMI codes), registration number tab (UI ready, pending live data), and make/model selector
+- **mntstat.ee Integration** — Server-side vehicle scraper for 829K+ Estonian vehicles by registration number or filters
+- **OpenData API Integration** — `parse.py` tries avaandmed.eesti.ee API first, falls back to URL-guessing
 - **Sync & Upload** — Manual .xlsx upload and auto-fetch from Transpordiamet on the 20th of each month
-- **26 months of data** — January 2024 through February 2026 (järelturg only)
-- **Zero dependencies** — Single `index.html` file, CDN-hosted Chart.js and SheetJS, GitHub Pages hosting
+- **26 months × 2 categories** — January 2024 through February 2026 (järelturg + new cars)
+- **Zero dependencies** — Single `index.html` file (~2100 lines), CDN-hosted Chart.js and SheetJS, GitHub Pages hosting
 
-## Vision (v2+)
+## Vision (v3+)
 
 The platform will expand to include:
 
-- All 3 market categories (new, import, aftermarket) with cross-category comparison
-- Pricing intelligence from Estonian and European car marketplaces
+- Pricing intelligence from Estonian and European car marketplaces (mobile.de, AutoScout24, auto24.ee)
 - Depreciation analysis with age-based value curves
-- Vehicle lookup via make/model selector, VIN code, or registration number
 - Per-vehicle market context report combining transaction history, pricing, and depreciation
+- Import data from alternative source (infoleht has no import sheet)
+- Live registration number lookup via ATV API (pending formal application)
 
 ## Target Users
 
@@ -67,9 +71,11 @@ The platform will expand to include:
 
 Single-page application with no build step. See [Architecture](architecture.md) for full details.
 
-- **Frontend:** Vanilla JS + CSS, Chart.js for visualizations
-- **Data pipeline:** Python (parse.py) for server-side Excel parsing
-- **Storage:** JSON file (data.json) committed to repo, localStorage for client persistence
+- **Frontend:** Vanilla JS + CSS (~2100 lines in single index.html), Chart.js for visualizations
+- **Data pipeline:** Python (`parse.py`) for server-side Excel parsing with OpenData API integration
+- **Vehicle scraper:** Python (`scrape_vehicle.py`) for mntstat.ee lookups
+- **VIN decode:** Client-side JS with 70+ WMI codes
+- **Storage:** JSON file (`data.json`) committed to repo, localStorage for client persistence
 - **Hosting:** GitHub Pages with GitHub Actions for monthly data updates
 
 ## Documentation Index

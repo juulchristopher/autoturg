@@ -6,22 +6,28 @@ Estonian used car market intelligence platform. Live at https://juulchristopher.
 
 ## Architecture
 
-Single-file SPA (`index.html`, ~1590 lines) with inline CSS + JS. No build step.
+Single-file SPA (`index.html`, ~2100 lines) with inline CSS + JS. No build step.
 - **Charts:** Chart.js 4.4.1 (CDN)
 - **Excel parsing:** SheetJS 0.18.5 (CDN, client-side)
-- **Storage:** localStorage (`jarelturDB_v3`), data loaded from JSON
+- **Data pipeline:** `parse.py` (Python, openpyxl) — tries avaandmed.eesti.ee API first, falls back to URL-guessing
+- **Vehicle scraper:** `scrape_vehicle.py` (Python) — mntstat.ee lookup by reg number or filters (server-side only)
+- **VIN decode:** Client-side JS in index.html, 70+ WMI codes
+- **Storage:** localStorage (`jarelturDB_v3`), data loaded from `data.json` (3 categories: jarelturg, newCars, imports)
 - **Hosting:** GitHub Pages
 
 Read `docs/architecture.md` for full system design.
 
 ## Key Conventions
 
-- All code lives in `index.html` (inline `<style>` and `<script>` blocks)
+- All frontend code lives in `index.html` (inline `<style>` and `<script>` blocks)
+- Server-side scripts: `parse.py` (data pipeline), `scrape_vehicle.py` (vehicle lookup)
 - CSS uses design tokens via CSS custom properties (`:root` vars)
 - JavaScript is vanilla — no modules, no build step, no framework
 - Make names are always UPPERCASE
 - Model splitting: first word = model, rest = variant. Exception: Tesla multi-word models (MODEL 3, MODEL S, etc.)
 - Skip summary rows: KOKKU, TOTAL, ZUSAMMEN, SUM
+- Multi-category data: `{jarelturg:[], newCars:[], imports:[]}` — all share same MonthEntry schema
+- Searchable combobox UI: `createCombobox()` factory function used in both Comparison and Vehicle Lookup pages
 
 ## Documentation
 
@@ -47,3 +53,5 @@ Short imperative messages. Examples from history:
 
 - Transpordiamet monthly infoleht .xlsx files (sheets: Järelturg, Esmased/Uued, Import)
 - Download pattern: `https://www.transpordiamet.ee/sites/default/files/documents/YYYY-MM/INFOLEHT-MMYYYY.xlsx`
+- avaandmed.eesti.ee Open Data API (API key via `OPENDATA_API_KEY` env var)
+- mntstat.ee public vehicle database (829K+ vehicles, scraped server-side)

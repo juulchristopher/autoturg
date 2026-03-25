@@ -2,7 +2,7 @@
 
 > All data models, storage formats, and normalization rules.
 
-**Last updated:** 2026-03-25
+**Last updated:** 2026-03-26
 
 ---
 
@@ -74,43 +74,13 @@ Client-side data is cached under key `jarelturDB_v3`. The value is the full `dat
 
 ---
 
-## 2. Planned: Multi-Category Transaction Data
+## 2. Multi-Category Data (LIVE)
 
-### Extended data.json Structure
+The `data.json` top-level structure uses category-specific arrays. All categories share the same `MonthEntry` schema. Currently populated: 26 months járelturg + 26 months newCars. Imports array is empty (infoleht has no import sheet; needs alternative source).
 
-```json
-{
-  "jarelturg": [ MonthEntry, ... ],
-  "newCars": [ MonthEntry, ... ],
-  "imports": [ ImportMonthEntry, ... ]
-}
-```
+### ImportMonthEntry (Planned)
 
-The top-level `months` array will be replaced with category-specific arrays. Each uses the same `MonthEntry` schema, with category-specific extensions.
-
-### ImportMonthEntry
-
-Extends `MonthEntry` with import-specific fields:
-
-```json
-{
-  "year": 2024,
-  "month": 6,
-  "label": "Jun 2024",
-  "sheetUsed": "Import",
-  "rows": [
-    {
-      "make": "BMW",
-      "model": "3",
-      "variant": "320d",
-      "fullModel": "3 320d",
-      "prodYear": 2018,
-      "count": 45,
-      "originCountry": "DE"
-    }
-  ]
-}
-```
+When import data becomes available, may extend `MonthEntry` with:
 
 | Additional Field | Type | Description |
 |-----------------|------|-------------|
@@ -118,11 +88,80 @@ Extends `MonthEntry` with import-specific fields:
 
 ---
 
-## 3. Planned: Vehicle Lookup
+## 3. Vehicle Lookup
 
-### VehicleLookup
+### VIN Decode Result (client-side)
 
-Returned from ATV API or Open Data Portal when a user queries by VIN or registration number.
+Returned by `decodeVIN(vin)` in `index.html`:
+
+```json
+{
+  "isValid": true,
+  "vin": "WBAXXXXXXXXXXXXXXX",
+  "wmi": "WBA",
+  "vds": "XXXXXX",
+  "make": "BMW",
+  "modelYear": 2018,
+  "yearCode": "J",
+  "plant": "X",
+  "serial": "XXXXXX"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `isValid` | `boolean` | Whether VIN passes validation (17 chars, no I/O/Q) |
+| `vin` | `string` | Uppercase VIN string |
+| `wmi` | `string` | World Manufacturer Identifier (chars 1-3) |
+| `vds` | `string` | Vehicle Descriptor Section (chars 4-9) |
+| `make` | `string` | Decoded manufacturer from WMI_MAP (70+ codes) |
+| `modelYear` | `number \| null` | Decoded from position 10 via YEAR_CODES |
+| `yearCode` | `string` | Raw character at VIN position 10 |
+| `plant` | `string` | Assembly plant code (char 11) |
+| `serial` | `string` | Sequential production number (chars 12-17) |
+
+### mntstat.ee Scraper Result (server-side)
+
+Returned by `scrape_vehicle.py` `search_by_reg()`:
+
+```json
+{
+  "regNumber": "100BMW",
+  "status": "Arvel",
+  "count": "1",
+  "make": "BMW",
+  "model": "IX XDRIVE40",
+  "bodyType": "Mahtuniversaal",
+  "year": 2022,
+  "color": "HALL",
+  "fuelType": "Elekter",
+  "transmission": "Automaatkäigukast",
+  "powerKw": 240,
+  "engineCc": 0,
+  "weightKg": 2440,
+  "county": "Harju maakond"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `regNumber` | `string` | Estonian registration plate number |
+| `status` | `string` | Registration status (e.g., "Arvel") |
+| `make` | `string` | Manufacturer, UPPERCASE |
+| `model` | `string` | Full model name |
+| `bodyType` | `string` | Body type in Estonian (e.g., "Mahtuniversaal") |
+| `year` | `number` | Production/registration year |
+| `color` | `string` | Vehicle color in Estonian |
+| `fuelType` | `string` | Fuel type in Estonian (e.g., "Diisel", "Elekter") |
+| `transmission` | `string` | Transmission type in Estonian |
+| `powerKw` | `number` | Engine power in kilowatts |
+| `engineCc` | `number` | Engine displacement in cc (0 for electric) |
+| `weightKg` | `number` | Vehicle weight in kg |
+| `county` | `string` | Registration county in Estonian |
+
+### VehicleLookup (Planned — ATV API)
+
+Full vehicle registry data from Transpordiamet ATV API (pending formal application + €15/mo):
 
 ```json
 {
@@ -142,23 +181,6 @@ Returned from ATV API or Open Data Portal when a user queries by VIN or registra
   "ownerChangeCount": 2
 }
 ```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `vin` | `string` | 17-character Vehicle Identification Number |
-| `regNumber` | `string` | Estonian registration plate number |
-| `make` | `string` | Manufacturer |
-| `model` | `string` | Model name |
-| `variant` | `string` | Trim/configuration |
-| `prodYear` | `number` | Year of manufacture |
-| `fuelType` | `string` | petrol, diesel, electric, hybrid, plugin_hybrid |
-| `powerKw` | `number` | Engine power in kilowatts |
-| `bodyType` | `string` | sedan, wagon, hatchback, suv, coupe, convertible, van |
-| `color` | `string` | Vehicle color |
-| `firstRegDate` | `string` | ISO 8601 date of first registration anywhere |
-| `firstRegInEstonia` | `string \| null` | ISO 8601 date of first registration in Estonia |
-| `mileage` | `number \| null` | Last known mileage (km), if available |
-| `ownerChangeCount` | `number` | Number of ownership changes in Estonia |
 
 ---
 
@@ -296,8 +318,7 @@ All prices are stored in EUR. Listings in other currencies are converted at inge
 
 | Stage | Format | Size Estimate | When |
 |-------|--------|---------------|------|
-| **Current** | Single `data.json` | ~1MB (26 months, jarelturg only) | Now |
-| **Phase 1** | Single `data.json` with 3 categories | ~3MB | After expanding to 3 categories |
+| **Current** | Single `data.json` with 3 categories | ~2MB (26 months × 2 categories) | Now (Phase 2 complete) |
 | **Phase 3** | `data.json` + `prices.json` | ~5-10MB total | After adding pricing data |
 | **Phase 4+** | SQLite or cloud DB | Unlimited | When static JSON becomes unwieldy |
 

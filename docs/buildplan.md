@@ -2,7 +2,7 @@
 
 > Phased delivery roadmap with milestones and dependencies.
 
-**Last updated:** 2026-03-25
+**Last updated:** 2026-03-26
 
 ---
 
@@ -26,16 +26,14 @@ gantt
     UI: category tabs & navigation      :done, p1d, 2026-03-24, 1d
     Combined cross-category overview    :done, p1e, 2026-03-24, 1d
 
-    section Phase 2: API Integration & Data Pipeline
-    andmed.eesti.ee API integration     :p2a, 2026-03-26, 7d
-    Statistikaamet API (TS322)          :p2b, after p2a, 5d
-    Replace URL-guessing with API fetch :p2c, after p2a, 3d
-    VIN decode logic (client-side)      :p2d, after p2a, 5d
-    mntstat.ee vehicle scraper          :p2e, after p2d, 7d
-    Vehicle detail panel UI             :p2f, after p2d, 7d
-    Input UI: VIN / reg / selector      :p2g, after p2f, 5d
+    section Phase 2: API Integration & Data Pipeline ✓
+    andmed.eesti.ee API integration     :done, p2a, 2026-03-25, 1d
+    VIN decode logic (client-side)      :done, p2d, 2026-03-25, 1d
+    mntstat.ee vehicle scraper          :done, p2e, 2026-03-25, 1d
+    Vehicle detail panel UI             :done, p2f, 2026-03-25, 1d
+    Input UI: VIN / reg / selector      :done, p2g, 2026-03-25, 1d
     Apply for AVP access                :crit, p2h, 2026-03-26, 21d
-    Milestone: API + lookup live        :milestone, p2m, after p2g, 0d
+    Milestone: API + lookup live        :milestone, p2m, 2026-03-26, 0d
 
     section Phase 3: Pricing Intelligence
     mobile.de API integration           :p3a, after p2m, 14d
@@ -99,39 +97,28 @@ gantt
 
 ---
 
-## Phase 2: API Integration & Data Pipeline
+## Phase 2: API Integration & Data Pipeline (DONE)
 
 **Objective:** Replace URL-guessing with proper API access, add vehicle lookup via VIN/registration number.
 
-**Prerequisites:** Phase 1 complete.
-
-**Tasks:**
-1. Integrate andmed.eesti.ee OpenData API for programmatic infoleht access
-2. Integrate Statistikaamet API (andmed.stat.ee) for TS322 first-registration data
-3. Replace URL candidate guessing in parse.py with API-driven data fetching
-4. Build client-side VIN decode (WMI → make, VDS → model/year)
-5. Build mntstat.ee scraper for vehicle details by registration number
-6. Create vehicle detail panel in UI showing specs + market context
-7. Build input UI: make/model selector, VIN field, registration number field
-8. Apply for AVP access from Transpordiamet (critical path, long lead time)
+**Completed:** 2026-03-25 (Sprint 2)
 
 **Deliverables:**
-- [ ] parse.py fetches infoleht data via andmed.eesti.ee API instead of URL guessing
-- [ ] Statistikaamet TS322 data integrated for first-registration statistics
-- [ ] VIN input decodes make, model, year client-side
-- [ ] mntstat.ee scraper returns vehicle specs by registration number
-- [ ] Vehicle detail panel shows specs + transaction history + market position
-- [ ] Input method switcher (dropdown, VIN, reg number)
+- [x] parse.py tries avaandmed.eesti.ee API first, falls back to URL-guessing
+- [ ] Statistikaamet TS322 data integrated (deferred — current pipeline sufficient)
+- [x] VIN input decodes make, model year client-side (70+ WMI codes)
+- [x] mntstat.ee scraper returns vehicle specs by registration number
+- [x] Vehicle detail panel shows specs + transaction history + market position
+- [x] Input method switcher (VIN tab, Reg tab, Make/Model selector)
 
-**Risks:**
-- andmed.eesti.ee API may require registration for API key
-- mntstat.ee scraping may break if site layout changes — need resilient selectors
-- AVP application takes weeks — scraping is the interim fallback
-- Rate limits on mntstat.ee unknown
+**Notes:**
+- OpenData API requires API key (free registration at avaandmed.eesti.ee), configured via `OPENDATA_API_KEY` env var
+- mntstat.ee form uses `make[]`, `model[]`, `from`, `to` params (not `automarg`/`aasta_min`)
+- mntstat.ee table columns: Staatus, Kokku, Mark, Mudel, Keretüüp, Aasta, Värv, Mootoritüüp, Käigukast, Kw, CC, Kg, Maakond
+- Reg number tab UI is ready but pending live data access (mntstat scraper is server-side only)
+- AVP formal application still pending (critical path for Phase 3+)
 
-**Definition of Done:** Data pipeline uses APIs instead of URL guessing. User can enter a VIN or registration number and see vehicle details plus market context.
-
-**References:** FR-006, FR-010, FR-011, FR-015, FR-016, US-13, US-14, US-15
+**References:** FR-006 (DONE), FR-010 (DONE), FR-011 (DONE), FR-015 (DONE), FR-016 (DONE)
 
 ---
 

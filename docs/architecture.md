@@ -2,7 +2,7 @@
 
 > System components, data flow, technology decisions, and integration design.
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-03-26
 
 ---
 
@@ -22,6 +22,7 @@ flowchart TB
 
     subgraph ingestion["Ingestion Layer"]
         PP["parse.py\n(Excel → JSON)"]
+        SV["scrape_vehicle.py\n(mntstat.ee)"]
         API_PROXY["API Proxy\n(serverless)"]
         SCRAPER["Scraper\n(auto24/autoportaal)"]
     end
@@ -44,9 +45,11 @@ flowchart TB
     end
 
     TA --> PP
+    ODP --> PP
     PP --> DJ
+    MNT["mntstat.ee"] --> SV
+    SV --> VDB
     ATV --> API_PROXY
-    ODP --> API_PROXY
     MDE --> API_PROXY
     AS24 --> API_PROXY
     A24 --> SCRAPER
@@ -73,11 +76,13 @@ The current system is deliberately simple: a static site with a Python data pipe
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **Frontend** | `index.html` (1590 lines, inline CSS + JS) | Single-page dashboard with 3 views |
-| **Charts** | Chart.js 4.4.1 (CDN) | Line, donut, and bar charts |
+| **Frontend** | `index.html` (~2100 lines, inline CSS + JS) | Single-page dashboard with 4 views (Overview, Comparison, Sync, Vehicle Lookup) |
+| **Charts** | Chart.js 4.4.1 (CDN) | Line, donut, bar, and stacked bar charts |
 | **Excel parsing** | SheetJS 0.18.5 (CDN) | Client-side .xlsx parsing for manual uploads |
-| **Data pipeline** | `parse.py` (Python 3, openpyxl) | Server-side Excel parsing, outputs data.json |
-| **Storage** | `data.json` (committed to repo) | 26 months of järelturg transaction data |
+| **Data pipeline** | `parse.py` (Python 3, openpyxl) | Server-side Excel parsing for 3 categories, outputs data.json. Tries avaandmed.eesti.ee API first, falls back to URL-guessing |
+| **Vehicle scraper** | `scrape_vehicle.py` (Python 3) | Server-side mntstat.ee scraper for vehicle lookup by reg number or filters |
+| **VIN decode** | Client-side JS in `index.html` | Decodes make + model year from VIN using 70+ WMI codes |
+| **Storage** | `data.json` (committed to repo) | 26 months × 2 categories (järelturg + newCars) transaction data |
 | **Client storage** | localStorage (`jarelturDB_v3`) | Cached data for offline use |
 | **CI/CD** | GitHub Actions | Monthly cron on 20th runs parse.py and commits data.json |
 | **Hosting** | GitHub Pages | Static file serving |
@@ -94,25 +99,46 @@ sequenceDiagram
     participant LS as localStorage
 
     Note over GHA: 20th of each month
-    GHA->>TA: Download infoleht .xlsx
     GHA->>PP: Run parse.py
-    PP->>PP: Find järelturg sheet
+    PP->>ODP: Try avaandmed.eesti.ee API (if API key set)
+    ODP-->>PP: Dataset download (or fail)
+    PP->>TA: Fallback: URL-guessing for infoleht .xlsx
+    TA-->>PP: .xlsx file
+    PP->>PP: Find sheets for järelturg, newCars, imports
     PP->>PP: Parse rows (make, model, variant, prodYear, count)
-    PP->>DJ: Merge new month into data.json
+    PP->>DJ: Merge new month into data.json (all categories)
     GHA->>GHA: Commit & push data.json
 
     SPA->>DJ: Fetch data.json on load
     SPA->>LS: Cache in localStorage
     SPA->>SPA: Render charts and tables
+    Note over SPA: Vehicle Lookup page
+    SPA->>SPA: VIN decode (client-side, 70+ WMI codes)
 ```
 
 ### parse.py Details
 
-- **URL generation:** Builds candidate download URLs for Transpordiamet infoleht files using multiple naming patterns (`INFOLEHT-MMYYYY.xlsx`, `INFOLEHT-MM-YYYY.xlsx`, etc.)
-- **Sheet detection:** `find_jarelturg_sheet()` searches for sheets containing keywords: järelturg, jarelturg, omaniku, owner, used, kasutatud
+- **API-first fetching:** `try_opendata_api()` searches avaandmed.eesti.ee for infoleht dataset using `OPENDATA_API_KEY` env var. Falls back to URL-guessing if API unavailable.
+- **URL generation:** `candidate_urls()` builds candidate download URLs using multiple naming patterns (`INFOLEHT-MMYYYY.xlsx`, `_statistika_esmased_ja_uued`, URL-encoded variants, etc.)
+- **Multi-category parsing:** `find_sheet_by_category(wb, category)` searches sheets using `SHEET_KEYWORDS` dict for járelturg, newCars, and imports keywords
 - **Column detection:** Identifies make (mark/märk), model (mudel), production year (aasta), and count (arv/kokku/hulk) columns
 - **Model splitting:** `split_model_variant()` splits "GOLF GTI" into model="GOLF", variant="GTI". Special handling for multi-word models like Tesla "MODEL 3", "MODEL S", "MODEL X", "MODEL Y"
 - **Deduplication:** Merges new month data with existing data.json, replacing if month already exists
+- **Format migration:** `load_data()` auto-migrates old `{months:[]}` format to new `{jarelturg:[], newCars:[], imports:[]}` schema
+
+### scrape_vehicle.py Details
+
+- **Registration lookup:** `search_by_reg(reg)` queries `mntstat.ee/search.php?reg_nr=XXX`
+- **Filtered search:** `search_by_filters(make, model, year_from, year_to)` uses `make[]`, `model[]`, `from`, `to` params
+- **HTML parsing:** Extracts `<td>` cells from `searchResult` table, groups by 13 columns (Staatus, Kokku, Mark, Mudel, Keretüüp, Aasta, Värv, Mootoritüüp, Käigukast, Kw, CC, Kg, Maakond)
+- **CLI usage:** `python scrape_vehicle.py 100BMW --json`
+- **Note:** Server-side only (CORS prevents client-side use). Reg tab UI is ready but pending live data access.
+
+### VIN Decode (client-side)
+
+- `WMI_MAP`: 70+ World Manufacturer Identifier codes covering top 20+ Estonian-market makes
+- `YEAR_CODES`: Model year decode from VIN position 10
+- `decodeVIN(vin)` validates (17 chars, no I/O/Q) and returns `{isValid, vin, wmi, vds, make, modelYear, yearCode, plant, serial}`
 
 ---
 
@@ -124,8 +150,8 @@ Each data source gets its own ingestion script:
 
 | Script | Source | Output | Schedule |
 |--------|--------|--------|----------|
-| `parse.py` | Transpordiamet .xlsx | data.json (transactions) | Monthly (20th) |
-| `fetch_odp.py` | andmed.eesti.ee API | data.json (registry data) | Monthly |
+| `parse.py` | Transpordiamet .xlsx + avaandmed.eesti.ee API | data.json (transactions, 3 categories) | Monthly (20th) |
+| `scrape_vehicle.py` | mntstat.ee | Vehicle specs (stdout/JSON) | On-demand |
 | `fetch_mobile.py` | mobile.de API | prices.json | Weekly |
 | `fetch_autoscout.py` | AutoScout24 API | prices.json | Weekly |
 | `scrape_auto24.py` | auto24.ee | prices.json | Weekly |
@@ -160,12 +186,20 @@ Decision: Start with option 3 (server-side pipeline via GitHub Actions) to keep 
 - **Rate limits:** Unknown, need to confirm with Transpordiamet
 - **Action needed:** Contact Transpordiamet for API credentials
 
-### Estonian Open Data Portal (andmed.eesti.ee)
-- **Auth:** None (public)
-- **Docs:** andmed.eesti.ee/api/dataset-docs/
-- **Data:** Vehicle registration statistics, transport data
-- **Integration:** Python script in GitHub Actions, outputs to data.json
+### Estonian Open Data Portal (avaandmed.eesti.ee)
+- **Auth:** API key (free registration at avaandmed.eesti.ee), set via `OPENDATA_API_KEY` env var
+- **Docs:** avaandmed.eesti.ee/api/v1/
+- **Data:** Infoleht datasets, vehicle registration statistics
+- **Integration:** Built into `parse.py` via `try_opendata_api()` — API-first with URL-guessing fallback
+- **Status:** DONE — integrated in Phase 2
 - **Rate limits:** Reasonable public API limits
+
+### mntstat.ee
+- **Auth:** None (public web)
+- **Data:** 829K+ registered vehicles in Estonia with specs
+- **Endpoints:** `search.php?reg_nr=XXX` (reg lookup), `search.php?make[]=BMW&from=2020&to=2025` (filtered), `data.php` POST (model dropdown)
+- **Integration:** `scrape_vehicle.py` — server-side HTML scraping
+- **Status:** DONE — integrated in Phase 2
 
 ### mobile.de
 - **Auth:** HTTP Basic (username/password)
@@ -200,22 +234,25 @@ Decision: Start with option 3 (server-side pipeline via GitHub Actions) to keep 
 ### Current Structure (single-file SPA)
 
 ```
-index.html
-├── <style>       CSS (design tokens, layout, components)
-├── <body>        HTML (sidebar, topbar, 3 page containers)
+index.html (~2100 lines)
+├── <style>       CSS (design tokens, layout, components, combobox, vehicle lookup)
+├── <body>        HTML (sidebar with categories + views, topbar, 4 page containers)
 └── <script>      JavaScript
-    ├── State     (db object, localStorage persistence)
-    ├── Router    (showPage(), nav button handlers)
+    ├── State     (db object with 3 categories, activeCategory, localStorage persistence)
+    ├── Categories(switchCategory(), activeMonths(), CATEGORY_LABELS, CATEGORY_DESC)
+    ├── Router    (showPage(), nav button handlers, pageTitlesForCategory())
     ├── Parsers   (parseFile(), extractJarelturg(), detectMonthYear())
+    ├── Combobox  (createCombobox() factory — reusable searchable dropdown)
     ├── Render    (renderOverview(), renderComparisonPage(), renderComparison())
-    ├── Charts    (Chart.js instances, chartOpts(), destroyChart())
+    ├── Vehicle   (decodeVIN(), showVehicleInfo(), showVehicleMarketData())
+    ├── Charts    (Chart.js instances, chartOpts(), destroyChart(), stacked bar for koguTurg)
     ├── Sync      (triggerAutoFetch(), handleFiles())
     └── Utils     (colorFor(), log(), setProgress())
 ```
 
 ### Evolution Path
 
-1. **Phase 1-2:** Stay with single `index.html`. Add new page sections for market categories and vehicle lookup.
+1. **Phase 0-2 (DONE):** Single `index.html` with 4 views, category navigation, vehicle lookup. Currently ~2100 lines.
 2. **Phase 3:** If file exceeds ~3000 lines, split into `styles.css`, `app.js`, and `index.html`.
 3. **Phase 4-5:** Evaluate component framework (Svelte or Preact) if UI complexity warrants it. Decision gate: if more than 5 distinct interactive views are needed.
 
@@ -239,6 +276,12 @@ index.html
 **Revisit when:** Never — this is the right long-term pattern.
 
 ### ADR-004: When to introduce a backend
-**Decision:** Defer until Phase 2 (vehicle lookup).
-**Rationale:** Transaction data and pricing data can be pre-computed and served as static JSON. Vehicle lookup requires real-time API calls which need a server or serverless proxy.
+**Decision:** Defer until Phase 3 (pricing intelligence).
+**Rationale:** Phase 2 vehicle lookup is handled via client-side VIN decode and server-side mntstat.ee scraper (CLI tool). Real-time API calls for pricing data in Phase 3 will need a server or serverless proxy.
 **Target:** Cloudflare Workers for lightweight API proxy.
+**Updated:** Phase 2 completed without needing a backend — mntstat.ee scraper runs server-side only, reg tab UI is ready but pending live data integration.
+
+### ADR-005: API-first data fetching with fallback
+**Decision:** parse.py tries avaandmed.eesti.ee Open Data API first, falls back to URL-guessing for Transpordiamet files.
+**Rationale:** API is more reliable and forward-looking than URL-guessing (which depends on undocumented naming conventions). Fallback ensures continuity if API is down or API key not configured.
+**Date:** 2026-03-25

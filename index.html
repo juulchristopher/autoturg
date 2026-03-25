@@ -1023,6 +1023,22 @@ body {
             <p class="insight-text" id="vehicleInsightText"></p>
           </div>
 
+          <!-- Drill-down selector (shown when only make is known, e.g. after VIN decode) -->
+          <div id="vehicleDrilldown" class="card" style="display:none;margin-bottom:16px">
+            <div class="card-title" id="drilldownTitle">Select your model for detailed comparison</div>
+            <div class="card-desc" id="drilldownDesc">We detected the make from your VIN. Pick a model to see how it compares.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+              <div>
+                <div class="combobox-label">MODEL</div>
+                <div id="drilldownModel"></div>
+              </div>
+              <div>
+                <div class="combobox-label">CONFIGURATION</div>
+                <div id="drilldownVariant"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- Model comparison within make -->
           <div id="modelComparison" class="card" style="display:none;margin-bottom:16px">
             <div class="card-title" id="modelCompTitle">Model popularity</div>
@@ -2169,9 +2185,102 @@ function showVehicleReport({ make, model, variant, year, vin }) {
   if (vin) detailParts.push(`VIN: ${vin}`);
   heroEl.innerHTML = `
     <div class="vehicle-hero-make">${make}</div>
-    <div class="vehicle-hero-model">${model || 'All models'}</div>
+    <div class="vehicle-hero-model">${model || (variant ? variant : 'Select model below')}</div>
     ${detailParts.length ? `<div class="vehicle-hero-detail">${detailParts.join(' · ')}</div>` : ''}
   `;
+
+  // Drill-down selector: show when model not yet selected
+  const drilldownEl = document.getElementById('vehicleDrilldown');
+  const drilldownModelEl = document.getElementById('drilldownModel');
+  const drilldownVariantEl = document.getElementById('drilldownVariant');
+  // Store vin/year for re-render
+  const reportContext = { make, year, vin };
+
+  if (!model) {
+    drilldownEl.style.display = 'block';
+    document.getElementById('drilldownTitle').textContent = `Select your ${make} model`;
+    document.getElementById('drilldownDesc').textContent = vin
+      ? `We detected ${make}${year ? ' ('+year+')' : ''} from your VIN. Pick a model to see detailed comparisons.`
+      : `Select a model to see how it compares to other ${make} models.`;
+
+    const drillModelOpts = modelsForMake(make).filter(([m]) => m); // exclude empty
+    drilldownModelEl.innerHTML = '';
+    drilldownModelEl.appendChild(createCombobox({
+      placeholder: '-- Select model --',
+      options: drillModelOpts,
+      selectedValue: '',
+      onSelect: (val) => {
+        if (val) showVehicleReport({ ...reportContext, model: val, variant: null });
+      }
+    }));
+
+    drilldownVariantEl.innerHTML = '';
+    drilldownVariantEl.appendChild(createCombobox({
+      placeholder: '-- Select model first --',
+      options: [],
+      selectedValue: '',
+      disabled: true,
+      onSelect: () => {}
+    }));
+  } else if (model && !variant) {
+    // Model selected but no variant — show variant drill-down
+    const varOpts = variantsForMakeModel(make, model);
+    if (varOpts.length > 1) {
+      drilldownEl.style.display = 'block';
+      document.getElementById('drilldownTitle').textContent = `Narrow down to a specific ${make} ${model} configuration`;
+      document.getElementById('drilldownDesc').textContent = `${varOpts.length} configurations available. Select one to see how it compares.`;
+
+      drilldownModelEl.innerHTML = '';
+      drilldownModelEl.appendChild(createCombobox({
+        placeholder: model,
+        options: modelsForMake(make).filter(([m]) => m),
+        selectedValue: model,
+        onSelect: (val) => {
+          if (val) showVehicleReport({ ...reportContext, model: val, variant: null });
+        }
+      }));
+
+      drilldownVariantEl.innerHTML = '';
+      drilldownVariantEl.appendChild(createCombobox({
+        placeholder: '-- All configurations --',
+        options: varOpts,
+        selectedValue: '',
+        allLabel: 'All configurations',
+        onSelect: (val) => {
+          showVehicleReport({ ...reportContext, model, variant: val || null });
+        }
+      }));
+    } else {
+      drilldownEl.style.display = 'none';
+    }
+  } else {
+    // Fully specified — still allow changing
+    drilldownEl.style.display = 'block';
+    document.getElementById('drilldownTitle').textContent = `Change selection`;
+    document.getElementById('drilldownDesc').textContent = `Currently viewing ${label}`;
+
+    drilldownModelEl.innerHTML = '';
+    drilldownModelEl.appendChild(createCombobox({
+      placeholder: model,
+      options: modelsForMake(make).filter(([m]) => m),
+      selectedValue: model,
+      onSelect: (val) => {
+        if (val) showVehicleReport({ ...reportContext, model: val, variant: null });
+      }
+    }));
+
+    const varOpts = variantsForMakeModel(make, model);
+    drilldownVariantEl.innerHTML = '';
+    drilldownVariantEl.appendChild(createCombobox({
+      placeholder: '-- All configurations --',
+      options: varOpts,
+      selectedValue: variant || '',
+      allLabel: 'All configurations',
+      onSelect: (val) => {
+        showVehicleReport({ ...reportContext, model, variant: val || null });
+      }
+    }));
+  }
 
   // Calculate rankings
   const makeMap = {};

@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Estonian used car market intelligence — transaction trends, pricing, VIN decode, and model comparisons powered by Transpordiamet data.">
+<meta name="theme-color" content="#c8960a">
 <title>🇪🇪 Autoturg — Estonian Vehicle Market</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
 
@@ -898,6 +902,27 @@ body {
 .schedule-banner b { color: var(--text); }
 .schedule-banner .mono { font-family: var(--mono); color: var(--muted2); }
 
+/* ── HAMBURGER MENU ── */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  margin-right: 12px;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+}
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 99;
+}
+.sidebar-overlay.show { display: block; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 1100px) {
   .sidebar { width: 200px; min-width: 200px; }
@@ -906,11 +931,48 @@ body {
   .model-pick-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 768px) {
-  .sidebar { display: none; }
+  .hamburger { display: block; }
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 260px;
+    min-width: 260px;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: none;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+  }
+  .main { width: 100%; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .content { padding: 16px; }
   .topbar { padding: 14px 16px; }
   .model-pick-grid { grid-template-columns: 1fr 1fr; }
+  .price-cards-grid { grid-template-columns: 1fr; }
+  .price-box-plot { margin: 16px 8px 24px; }
+  .price-box-label { font-size: 8px; }
+  .price-source-row { grid-template-columns: 90px 1fr 70px; }
+  .category-tabs { flex-wrap: wrap; }
+  .vehicle-hero-model { font-size: 22px; }
+  .topbar-timeline { flex-wrap: wrap; gap: 6px; }
+  .timeline-preset { font-size: 10px !important; padding: 3px 8px !important; }
+  .card { padding: 16px; }
+  .combobox-input { font-size: 14px; padding: 10px 12px; }
+  .btn { padding: 10px 16px; font-size: 13px; }
+  .method-tabs .btn { padding: 8px 14px; }
+  .insight-card { padding: 14px 16px; }
+  .insight-text { font-size: 13px; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .topbar { padding: 12px 14px; }
+  .page-title { font-size: 14px; }
+  .stat-pill h3 { font-size: 24px; }
+  .price-card-value { font-size: 20px; }
+  .model-pick-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -955,12 +1017,18 @@ body {
     </div>
   </aside>
 
+  <!-- ─── SIDEBAR OVERLAY ─── -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
   <!-- ─── MAIN ─── -->
   <div class="main">
     <div class="topbar">
-      <div>
-        <div class="page-title" id="pageTitle">Monthly Overview</div>
-        <div class="page-sub" id="pageSub">Top 5 makes · järelturg transactions</div>
+      <div style="display:flex;align-items:center">
+        <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+        <div>
+          <div class="page-title" id="pageTitle">Monthly Overview</div>
+          <div class="page-sub" id="pageSub">Top 5 makes · järelturg transactions</div>
+        </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center" id="topbarRight">
       </div>
@@ -1548,7 +1616,10 @@ function showPage(id) {
   document.getElementById('pageSub').textContent = s;
   if (id === 'overview') renderOverview();
   if (id === 'comparison') renderComparisonPage();
-  if (id === 'vehicle') buildVehicleSelectorCombos();
+  if (id === 'vehicle') {
+    buildVehicleSelectorCombos();
+    if (priceData.aggregates.length === 0) fetchPrices(); // lazy load
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -1602,10 +1673,7 @@ async function fetchPrices() {
   }
 }
 
-window.addEventListener('load', async () => {
-  await fetchData();
-  await fetchPrices();
-});
+window.addEventListener('load', fetchData);
 
 // ═══════════════════════════════════════════════
 // OVERVIEW PAGE
@@ -3077,6 +3145,24 @@ function updateSyncPage() {
     </tr>`).join('')}</tbody>
   </table>`;
 }
+
+// ═══════════════════════════════════════════════
+// MOBILE SIDEBAR
+// ═══════════════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+}
+function closeSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+// Close sidebar when a nav button is clicked on mobile
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', closeSidebar);
+});
 
 // ═══════════════════════════════════════════════
 // UTILITIES

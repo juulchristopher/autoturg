@@ -259,7 +259,7 @@ Currently contains 252 aggregates and 1170 listings (sample data for 28 models Ã
 
 ---
 
-## 5. Planned: Depreciation Data
+## 5. Depreciation Data (LIVE â€” computed client-side)
 
 ### DepreciationCurve
 

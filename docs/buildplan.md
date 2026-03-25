@@ -45,12 +45,11 @@ gantt
     auto24.ee data strategy             :crit, p3i, 2026-03-27, 21d
     Milestone: pricing live (sample)    :milestone, p3m, 2026-03-26, 0d
 
-    section Phase 4: Depreciation Analysis
-    Depreciation curve computation      :p4a, after p3m, 7d
-    Depreciation charts UI              :p4b, after p4a, 7d
-    Value retention indicator           :p4c, after p4b, 5d
-    Cross-model depreciation comparison :p4d, after p4c, 5d
-    Milestone: depreciation live        :milestone, p4m, after p4d, 0d
+    section Phase 4: Depreciation Analysis ✓
+    Depreciation computation + chart    :done, p4a, 2026-03-26, 1d
+    Value retention indicator           :done, p4b, 2026-03-26, 1d
+    Cross-model depreciation comparison :done, p4c, 2026-03-26, 1d
+    Milestone: depreciation live        :milestone, p4m, 2026-03-26, 0d
 
     section Phase 5: Polish & Scale ✓
     Mobile responsive + hamburger menu  :done, p5a, 2026-03-26, 1d
@@ -161,29 +160,28 @@ gantt
 
 ---
 
-## Phase 4: Depreciation Analysis
+## Phase 4: Depreciation Analysis (DONE)
 
 **Objective:** Show how vehicles lose value over time and help buyers understand long-term cost of ownership.
 
-**Prerequisites:** Phase 3 complete (requires pricing data across production years).
+**Completed:** 2026-03-26 (Sprint 3)
 
 **Tasks:**
-1. Compute depreciation curves from historical pricing data (median price by vehicle age)
-2. Build depreciation chart UI (age vs. price with confidence bands)
-3. Create "value retention indicator" — simple score showing how well a model holds value
-4. Enable cross-model depreciation comparison (overlay multiple models)
+1. [x] Compute depreciation curves from pricing data (median price by vehicle age)
+2. [x] Build depreciation chart UI (age vs. price with P25-P75 confidence bands)
+3. [x] Create value retention indicator (Excellent/Good/Poor + annual % + 5-year residual)
+4. [x] Enable cross-model depreciation comparison in Comparison page
 
 **Deliverables:**
-- [ ] Depreciation curves for models with sufficient pricing data
-- [ ] Interactive depreciation chart with age-based view
-- [ ] Value retention score/indicator per model
-- [ ] Side-by-side depreciation comparison for competing models
+- [x] Depreciation curves computed client-side from prices.json aggregates
+- [x] Interactive depreciation chart with confidence band shading
+- [x] Value retention score: annual %, classification badge, 5-year residual
+- [x] Side-by-side depreciation comparison for competing models (overlay chart)
 
-**Risks:**
-- Requires sufficient pricing data across production years — some models may have sparse data
-- Depreciation varies by variant/configuration — decide granularity level
-
-**Definition of Done:** User can view depreciation curve for any model with 10+ data points, compare depreciation between models, and see a clear value retention indicator.
+**Notes:**
+- Depreciation computed from sample data — will improve with live pricing
+- Classification: ≤8% annual = Excellent, ≤11% = Good, >11% = Poor
+- Cross-model comparison uses scatter plot with linear x-axis (vehicle age in years)
 
 **References:** FR-012, US-08, US-09
 

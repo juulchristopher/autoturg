@@ -14,18 +14,33 @@
 **Files:** `parse.py`
 
 **What to do:**
+
+> ✅ **PM-verified API details (2026-03-25):** The API is live, public, no auth needed. Endpoints confirmed working.
+
 1. Use the andmed.eesti.ee OpenData API to find and download infoleht datasets programmatically
-2. API endpoints (based on the v1 API pattern):
-   - Search: `GET /api/v1/datasets/search?q=infoleht`
-   - Get dataset: `GET /api/v1/datasets/{datasetId}`
-   - Download: `GET /api/v1/datasets/{datasetId}/download?format=xlsx`
-   - Note: The portal transitioned from `avaandmed.eesti.ee` to `andmed.eesti.ee` — try both base URLs
-3. The dataset is called **"Infoleht (esmaste ja uute sõidukite statistika)"** — search for it by name
-4. If the API requires an API key, document the registration process in the code comments
-5. Replace the `candidate_urls()` function in parse.py with an API-driven approach:
-   - First try the API to get the download URL for the latest infoleht
-   - Fall back to the current URL-guessing logic if API fails
-6. Also check `https://andmed.stat.ee` for Statistikaamet API — table TS322 has first-registration data by month. The API uses POST requests with JSON query format (docs: `andmed.stat.ee/abi/api-juhend.pdf`)
+2. **Confirmed working API endpoints:**
+   - Search: `GET https://andmed.eesti.ee/api/datasets?search=infoleht`
+   - Get dataset: `GET https://andmed.eesti.ee/api/datasets/{id}`
+   - Download file: `GET https://andmed.eesti.ee/api/v2/datasets/{datasetIdentifier}/distribution/{distributionId}/file`
+   - **No API key required** — public access, rate limit 2000 req/window
+3. **Dataset details (confirmed):**
+   - Dataset ID: `1401f275-5b59-4bf9-b98a-61ea15bc95ea`
+   - Dataset Identifier (for download URL): `9d2f4b4d-9eab-45f7-97b2-543600621aff`
+   - Title: "Infoleht (esmaste ja uute sõidukite statistika)"
+   - Updated monthly by Transpordiamet, temporal coverage from 2006-01
+4. **Implementation flow:**
+   ```
+   Step 1: GET /api/datasets/1401f275-5b59-4bf9-b98a-61ea15bc95ea
+   Step 2: Parse response.distributions[] — each has titleEt ("Infoleht YYYY-MM") and accessUrls[0]
+   Step 3: Find latest month by sorting distributions on titleEt
+   Step 4: Download via accessUrls[0] (returns XLSX binary)
+   Step 5: Fallback to current URL-guessing if API fails
+   ```
+5. **Currently available on portal:** Nov 2025, Dec 2025, Jan 2026 (3 months only). Older months still need Transpordiamet URL fallback.
+6. **Example download URL:**
+   `https://andmed.eesti.ee/api/v2/datasets/9d2f4b4d-9eab-45f7-97b2-543600621aff/distribution/c5380a7d-6ec4-45ba-b84d-e8a4223ad615/file`
+   → Returns `INFOLEHT-012026.xlsx` (435KB)
+7. Also check `https://andmed.stat.ee` for Statistikaamet API — table TS322 has first-registration data by month. The API uses POST requests with JSON query format (docs: `andmed.stat.ee/abi/api-juhend.pdf`)
 
 **Acceptance criteria:**
 - parse.py can discover and download infoleht files via the Open Data API
@@ -35,7 +50,7 @@
 ---
 
 ### Task 2.2: VIN decode logic (client-side)
-**Status:** NOT STARTED
+**Status:** ✅ DONE — PM verified: VIN decode works (tested WBAPH5C55BA123456 → BMW, 2011)
 **Priority:** P1 — independent of API work
 **Files:** `index.html`
 
@@ -84,7 +99,7 @@
 ---
 
 ### Task 2.4: Vehicle detail panel UI
-**Status:** NOT STARTED
+**Status:** ✅ DONE — PM verified: Vehicle Lookup page with VIN/Reg/Make tabs, vehicle info card, stats pills, charts
 **Priority:** P2 — depends on Task 2.2 (VIN decode) being done
 **Files:** `index.html`
 
@@ -144,11 +159,14 @@
 
 ## Data Source Reference
 
-**andmed.eesti.ee API:**
+**andmed.eesti.ee API (✅ VERIFIED WORKING):**
 - Swagger docs: https://andmed.eesti.ee/api/dataset-docs/
-- Dataset: "Infoleht (esmaste ja uute sõidukite statistika)"
-- URL: https://andmed.eesti.ee/datasets/infoleht-(esmaste-ja-uute-soidukite-statistika)
-- API pattern: `GET /api/v1/datasets/search?q=infoleht&apiKey=YOUR_KEY`
+- Dataset page: https://andmed.eesti.ee/datasets/infoleht-(esmaste-ja-uute-soidukite-statistika)
+- **Search:** `GET https://andmed.eesti.ee/api/datasets?search=infoleht` (no auth)
+- **Get dataset:** `GET https://andmed.eesti.ee/api/datasets/1401f275-5b59-4bf9-b98a-61ea15bc95ea`
+- **Download:** `GET https://andmed.eesti.ee/api/v2/datasets/9d2f4b4d-9eab-45f7-97b2-543600621aff/distribution/{distributionId}/file`
+- Rate limit: 2000 req/window
+- Current files: INFOLEHT-112025.xlsx, INFOLEHT-122025.xlsx, INFOLEHT-012026.xlsx
 
 **Statistikaamet API (andmed.stat.ee):**
 - Table TS322: First registrations by month

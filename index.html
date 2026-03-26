@@ -983,7 +983,7 @@ body {
 
 <div class="app">
   <!-- ─── SIDEBAR ─── -->
-  <aside class="sidebar">
+  <aside class="sidebar" role="navigation" aria-label="Main navigation">
     <div class="sidebar-logo">
       <div class="logo-flag">🇪🇪</div>
       <div class="logo-title">Autoturg Monitor</div>
@@ -1022,7 +1022,7 @@ body {
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <!-- ─── MAIN ─── -->
-  <div class="main">
+  <div class="main" role="main">
     <div class="topbar">
       <div style="display:flex;align-items:center">
         <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
@@ -1128,6 +1128,7 @@ body {
             <div class="model-pick-grid" id="modelPickGrid"></div>
             <div style="display:flex;gap:8px;margin-top:8px">
               <button class="btn" onclick="renderComparison()">📊 Update Charts</button>
+              <button class="btn" onclick="exportComparisonCSV()" style="font-size:11px;color:var(--muted)">⬇ Export CSV</button>
               <button class="btn" id="addSlotBtn" onclick="addComparisonSlot()" style="display:none">+ Add model</button>
             </div>
           </div>
@@ -3402,6 +3403,40 @@ function updateSyncPage() {
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${m.sheetUsed||'—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
+}
+
+// ═══════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════
+function exportComparisonCSV() {
+  const activeSlots = slots.filter(s => s && s.make);
+  if (activeSlots.length === 0) return;
+
+  const months = filteredMonths();
+  const headers = ['Month', ...activeSlots.map(s => {
+    let l = s.make;
+    if (s.model) l += ' ' + s.model;
+    if (s.variant) l += ' ' + s.variant;
+    return l;
+  })];
+
+  const rows = months.map(m => {
+    const cols = activeSlots.map(s => {
+      return m.rows
+        .filter(r => r.make === s.make && (!s.model || r.model === s.model) && (!s.variant || r.variant === s.variant))
+        .reduce((sum, r) => sum + r.count, 0);
+    });
+    return [m.label, ...cols];
+  });
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `autoturg-comparison-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ═══════════════════════════════════════════════

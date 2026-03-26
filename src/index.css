@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 96%;
+    --foreground: 226 28% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 226 28% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 226 28% 14%;
+    --primary: 44 90% 41%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 30% 97%;
+    --secondary-foreground: 226 28% 14%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 20% 95%;
+    --accent-foreground: 226 28% 14%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 18% 89%;
+    --input: 218 18% 89%;
+    --ring: 44 90% 41%;
+    --radius: 0.625rem;
+    --chart-1: 44 90% 41%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 263 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Top loading bar */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: hsl(var(--primary));
+  z-index: 9999;
+  transition: width 0.3s ease;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: hsl(var(--muted));
+  border-radius: var(--radius);
+}

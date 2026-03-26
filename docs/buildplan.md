@@ -32,9 +32,7 @@ gantt
     mntstat.ee vehicle scraper          :done, p2e, 2026-03-25, 1d
     Vehicle detail panel UI             :done, p2f, 2026-03-25, 1d
     Input UI: VIN / reg / selector      :done, p2g, 2026-03-25, 1d
-    ATV API integration code            :done, p2h1, 2026-03-26, 1d
-    Cloudflare Worker proxy             :done, p2h2, 2026-03-26, 1d
-    Apply for ATV API access            :crit, p2h, 2026-03-26, 21d
+    Apply for AVP access                :crit, p2h, 2026-03-26, 21d
     Milestone: API + lookup live        :milestone, p2m, 2026-03-26, 0d
 
     section Phase 3: Pricing Intelligence ✓ (scaffold)

@@ -1228,14 +1228,27 @@ body {
             <div style="display:flex;gap:8px;align-items:flex-end">
               <div style="flex:1">
                 <div class="combobox-label">Estonian Registration Number</div>
-                <input type="text" id="regInput" class="combobox-input" placeholder="e.g. 123ABC" style="text-transform:uppercase;letter-spacing:0.1em;font-size:13px;padding:8px 10px" disabled>
+                <input type="text" id="regInput" class="combobox-input" placeholder="e.g. 123ABC" style="text-transform:uppercase;letter-spacing:0.1em;font-size:13px;padding:8px 10px"
+                  onkeydown="if(event.key==='Enter')lookupReg()">
               </div>
-              <button class="btn" disabled style="padding:8px 16px;opacity:0.5">Lookup</button>
+              <button class="btn primary" onclick="lookupReg()" style="padding:8px 16px">Lookup</button>
             </div>
-            <div style="margin-top:12px;padding:12px;background:var(--s3);border-radius:var(--radius);border:1px dashed var(--border2)">
+            <div id="regError" style="color:var(--red);font-size:11px;font-family:var(--mono);margin-top:6px;display:none"></div>
+            <div id="regStatus" style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted);display:none"></div>
+            <div id="regProxyNotice" style="margin-top:12px;padding:12px;background:var(--s3);border-radius:var(--radius);border:1px dashed var(--border2)">
               <div style="font-size:12px;color:var(--muted2)">
-                Registration lookup available Q2 2026 — pending data access from Transpordiamet.
+                <strong>Setup required:</strong> Deploy the vehicle proxy (<code>worker/vehicle-proxy.js</code>) to Cloudflare Workers,
+                or run <code>python fetch_vehicle.py --serve</code> locally.
+                Then set the proxy URL below.
               </div>
+              <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                <input type="text" id="proxyUrlInput" class="combobox-input"
+                  placeholder="https://autoturg-vehicle-proxy.your-subdomain.workers.dev"
+                  style="font-size:11px;padding:6px 8px;flex:1"
+                  onchange="saveProxyUrl()">
+                <button class="btn" onclick="testProxy()" style="font-size:11px;padding:5px 10px">Test</button>
+              </div>
+              <div id="proxyTestResult" style="font-size:11px;font-family:var(--mono);margin-top:4px"></div>
             </div>
           </div>
 
@@ -2366,6 +2379,7 @@ function switchVehicleTab(tab) {
   document.querySelectorAll('.vlookup-panel').forEach(p => p.style.display = 'none');
   document.getElementById(`vtab-${tab}`).style.display = 'block';
   if (tab === 'selector') buildVehicleSelectorCombos();
+  if (tab === 'reg') restoreProxyUrl();
 }
 
 function buildVehicleSelectorCombos() {
@@ -2403,6 +2417,11 @@ function buildVehicleSelectorCombos() {
   }));
 }
 
+function hideVehicleSpecsCard() {
+  const sc = document.getElementById('vehicleSpecsCard');
+  if (sc) sc.style.display = 'none';
+}
+
 function lookupVIN() {
   const input = document.getElementById('vinInput').value;
   const errEl = document.getElementById('vinError');
@@ -2414,6 +2433,7 @@ function lookupVIN() {
     return;
   }
   errEl.style.display = 'none';
+  hideVehicleSpecsCard();
 
   showVehicleReport({
     make: result.make || 'Unknown',
@@ -2426,6 +2446,7 @@ function lookupVIN() {
 
 function lookupBySelector() {
   if (!vehicleSelection.make) return;
+  hideVehicleSpecsCard();
   showVehicleReport({
     make: vehicleSelection.make,
     model: vehicleSelection.model || null,
@@ -2433,6 +2454,144 @@ function lookupBySelector() {
     year: null,
     vin: null,
   });
+}
+
+// ── Vehicle proxy (reg number lookup) ──
+let vehicleProxyUrl = localStorage.getItem('autoturg_proxy_url') || '';
+
+function saveProxyUrl() {
+  vehicleProxyUrl = document.getElementById('proxyUrlInput').value.trim().replace(/\/+$/, '');
+  localStorage.setItem('autoturg_proxy_url', vehicleProxyUrl);
+}
+
+function restoreProxyUrl() {
+  const input = document.getElementById('proxyUrlInput');
+  if (input && vehicleProxyUrl) input.value = vehicleProxyUrl;
+}
+
+async function testProxy() {
+  const resultEl = document.getElementById('proxyTestResult');
+  saveProxyUrl();
+
+  if (!vehicleProxyUrl) {
+    resultEl.innerHTML = '<span style="color:var(--red)">Enter a proxy URL first</span>';
+    return;
+  }
+
+  resultEl.innerHTML = '<span style="color:var(--muted)">Testing...</span>';
+
+  try {
+    const resp = await fetch(`${vehicleProxyUrl}/api/health`, { mode: 'cors' });
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      const atvNote = data.atvConfigured ? '✓ ATV API configured' : '⚠ ATV not configured (using mntstat.ee)';
+      resultEl.innerHTML = `<span style="color:var(--green)">✓ Proxy connected</span> · <span style="color:var(--muted)">${atvNote}</span>`;
+    } else {
+      resultEl.innerHTML = `<span style="color:var(--red)">Unexpected response</span>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<span style="color:var(--red)">✗ Cannot reach proxy: ${e.message}</span>`;
+  }
+}
+
+async function lookupReg() {
+  const input = document.getElementById('regInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const errEl = document.getElementById('regError');
+  const statusEl = document.getElementById('regStatus');
+
+  if (!input || input.length < 2) {
+    errEl.textContent = 'Enter a valid registration number';
+    errEl.style.display = 'block';
+    statusEl.style.display = 'none';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  if (!vehicleProxyUrl) {
+    errEl.textContent = 'Configure the vehicle proxy URL first (see setup below)';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  statusEl.textContent = `Looking up ${input}...`;
+  statusEl.style.display = 'block';
+
+  try {
+    const resp = await fetch(`${vehicleProxyUrl}/api/vehicle?reg=${encodeURIComponent(input)}`, { mode: 'cors' });
+    const json = await resp.json();
+
+    if (json.data && !json.data.error) {
+      statusEl.style.display = 'none';
+      const v = json.data;
+
+      // Show vehicle specs card
+      showVehicleSpecs(v);
+
+      // Show market report using the make/model from lookup
+      showVehicleReport({
+        make: v.make || 'Unknown',
+        model: v.model ? v.model.split(' ')[0] : null,
+        variant: v.model ? v.model.split(' ').slice(1).join(' ') : null,
+        year: v.prodYear,
+        vin: v.vin || null,
+      });
+    } else {
+      const msg = json.data?.error || 'Vehicle not found';
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      statusEl.style.display = 'none';
+    }
+  } catch (e) {
+    errEl.textContent = `Proxy error: ${e.message}. Check proxy URL and try again.`;
+    errEl.style.display = 'block';
+    statusEl.style.display = 'none';
+  }
+}
+
+function showVehicleSpecs(v) {
+  // Build specs card above the market report
+  const report = document.getElementById('vehicleReport');
+  let specsCard = document.getElementById('vehicleSpecsCard');
+  if (!specsCard) {
+    specsCard = document.createElement('div');
+    specsCard.id = 'vehicleSpecsCard';
+    specsCard.className = 'card';
+    specsCard.style.marginBottom = '16px';
+    report.parentNode.insertBefore(specsCard, report);
+  }
+
+  const specs = [
+    ['Registration', v.regNumber],
+    ['Make', v.make],
+    ['Model', v.model],
+    ['Year', v.prodYear],
+    ['Body type', v.bodyType],
+    ['Color', v.color],
+    ['Fuel', v.fuelType],
+    ['Transmission', v.transmission],
+    ['Power', v.powerKw ? v.powerKw + ' kW' : null],
+    ['Engine', v.engineCc ? v.engineCc + ' cc' : null],
+    ['Weight', v.weightKg ? v.weightKg + ' kg' : null],
+    ['County', v.county],
+    ['Status', v.status],
+    ['VIN', v.vin],
+    ['First reg.', v.firstRegDate],
+  ].filter(([, val]) => val);
+
+  const source = v.source === 'atv' ? 'Transpordiamet ATV' : 'mntstat.ee';
+
+  specsCard.innerHTML = `
+    <div class="card-title">Vehicle specifications <span class="price-sample-badge">${source}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px">
+      ${specs.map(([label, val]) => `
+        <div style="padding:8px;background:var(--s2);border-radius:6px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">${label}</div>
+          <div style="font-size:13px;font-weight:600;margin-top:2px">${val}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  specsCard.style.display = 'block';
 }
 
 // ── Ranking helpers ──

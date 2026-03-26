@@ -1,9 +1,0 @@
-name = "autoturg-vehicle-proxy"
-main = "vehicle-proxy.js"
-compatibility_date = "2024-01-01"
-
-# Deploy with: cd worker && wrangler deploy
-# Set secrets with: wrangler secret put ATV_API_KEY
-
-# Custom domain (optional):
-# routes = [{ pattern = "api.autoturg.ee/*", zone_name = "autoturg.ee" }]

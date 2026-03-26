@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useData } from '@/context/DataContext';
 import {
   makeOptionsWithCounts,
@@ -21,12 +21,20 @@ import {
   listingsBySource,
 } from '@/lib/price-utils';
 import { decodeVIN } from '@/lib/vin-decoder';
+import {
+  getProxyUrl,
+  setProxyUrl,
+  testProxyHealth,
+  lookupByReg,
+} from '@/lib/vehicle-proxy';
+import type { VehicleSpecs } from '@/types';
 import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import StatPill from '@/components/shared/StatPill';
 import InsightCard from '@/components/shared/InsightCard';
 import ChartCard from '@/components/shared/ChartCard';
 import VehicleCombobox from '@/components/shared/VehicleCombobox';
+import VehicleSpecsCard from '@/components/shared/VehicleSpecsCard';
 import TrendLineChart from '@/components/charts/TrendLineChart';
 import ProductionYearChart from '@/components/charts/ProductionYearChart';
 import MonthlyBarChart from '@/components/charts/MonthlyBarChart';
@@ -50,6 +58,10 @@ import {
   BarChart3,
   Layers,
   Clock,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Settings,
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import { baseChartOptions } from '@/lib/chart-config';
@@ -78,10 +90,112 @@ export default function VehicleLookup() {
   const [report, setReport] = useState<ReportState | null>(null);
   const [checkPrice, setCheckPrice] = useState<number | undefined>();
 
+  // Reg number lookup state
+  const [regInput, setRegInput] = useState('');
+  const [regError, setRegError] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
+  const [vehicleSpecs, setVehicleSpecs] = useState<VehicleSpecs | null>(null);
+  const [proxyUrlInput, setProxyUrlInput] = useState(getProxyUrl());
+  const [proxyStatus, setProxyStatus] = useState<{
+    type: 'idle' | 'testing' | 'ok' | 'error';
+    message?: string;
+  }>({ type: 'idle' });
+
+  // Clear specs card when switching away from reg tab
+  useEffect(() => {
+    if (activeTab !== 'reg') setVehicleSpecs(null);
+  }, [activeTab]);
+
   // Lazy-load prices on mount
   useEffect(() => {
     fetchPrices();
   }, [fetchPrices]);
+
+  // Reg number lookup handler
+  const handleRegLookup = useCallback(async () => {
+    const reg = regInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (reg.length < 2) {
+      setRegError('Enter a valid registration number');
+      return;
+    }
+
+    const currentProxy = getProxyUrl();
+    if (!currentProxy) {
+      setRegError('Configure the vehicle proxy URL first (see setup below)');
+      return;
+    }
+
+    setRegError('');
+    setRegLoading(true);
+    setVehicleSpecs(null);
+
+    try {
+      const result = await lookupByReg(reg);
+      const v = result.data;
+
+      if ('error' in v) {
+        setRegError(v.error);
+        setRegLoading(false);
+        return;
+      }
+
+      setVehicleSpecs(v);
+
+      // Split model into model + variant for market report
+      const modelParts = (v.model || '').split(' ');
+      const model = modelParts[0] || null;
+      const variant = modelParts.slice(1).join(' ') || null;
+
+      setReport({
+        make: v.make || 'Unknown',
+        model,
+        variant,
+        year: v.prodYear,
+        vin: v.vin || null,
+      });
+
+      setSelection({
+        make: v.make || '',
+        model: model || '',
+        variant: variant || '',
+      });
+    } catch (e: any) {
+      setRegError(`Proxy error: ${e.message}. Check proxy URL and try again.`);
+    } finally {
+      setRegLoading(false);
+    }
+  }, [regInput]);
+
+  // Test proxy connection
+  const handleTestProxy = useCallback(async () => {
+    const url = proxyUrlInput.trim().replace(/\/+$/, '');
+    setProxyUrl(url);
+    setProxyUrlInput(url);
+
+    if (!url) {
+      setProxyStatus({ type: 'error', message: 'Enter a proxy URL first' });
+      return;
+    }
+
+    setProxyStatus({ type: 'testing' });
+
+    try {
+      const health = await testProxyHealth(url);
+      if (health.status === 'ok') {
+        const atvNote = health.atvConfigured
+          ? 'ATV API configured'
+          : 'Using mntstat.ee fallback';
+        setProxyStatus({ type: 'ok', message: `Connected — ${atvNote}` });
+      } else {
+        setProxyStatus({ type: 'error', message: 'Unexpected response' });
+      }
+    } catch (e: any) {
+      setProxyStatus({
+        type: 'error',
+        message: `Cannot reach proxy: ${e.message}`,
+      });
+    }
+  }, [proxyUrlInput]);
 
   // Make/model/variant options
   const makeOpts = useMemo(() => makeOptionsWithCounts(months), [months]);
@@ -290,23 +404,100 @@ export default function VehicleLookup() {
 
               <TabsContent value="reg">
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Input
-                    placeholder="e.g. 123ABC"
-                    disabled
-                    className="flex-1 font-mono uppercase"
-                  />
-                  <Button disabled className="shrink-0">
-                    Look up
+                  <div className="flex-1">
+                    <Input
+                      placeholder="e.g. 123ABC"
+                      value={regInput}
+                      onChange={(e) =>
+                        setRegInput(
+                          e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                        )
+                      }
+                      onKeyDown={(e) => e.key === 'Enter' && handleRegLookup()}
+                      className="font-mono uppercase"
+                    />
+                    {regError && (
+                      <div className="flex items-center gap-1.5 mt-2 text-sm text-destructive">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        {regError}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleRegLookup}
+                    disabled={regLoading || regInput.length < 2}
+                    className="shrink-0"
+                  >
+                    {regLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                        Looking up...
+                      </>
+                    ) : (
+                      'Look up'
+                    )}
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <Badge variant="secondary" className="text-xs">
-                    Coming Q2 2026
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Registration number lookup requires server-side mntstat.ee
-                    integration.
-                  </span>
+
+                {/* Proxy setup */}
+                <div className="mt-4 rounded-lg border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+                    <Settings className="h-3.5 w-3.5" />
+                    Vehicle Proxy Setup
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Deploy{' '}
+                    <code className="font-mono text-[11px] bg-muted px-1 py-0.5 rounded">
+                      worker/vehicle-proxy.js
+                    </code>{' '}
+                    to Cloudflare Workers, or run{' '}
+                    <code className="font-mono text-[11px] bg-muted px-1 py-0.5 rounded">
+                      python fetch_vehicle.py --serve
+                    </code>{' '}
+                    locally. Then enter the proxy URL below.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      placeholder="https://autoturg-vehicle-proxy.your-subdomain.workers.dev"
+                      value={proxyUrlInput}
+                      onChange={(e) => setProxyUrlInput(e.target.value)}
+                      onBlur={() => {
+                        const url = proxyUrlInput.trim().replace(/\/+$/, '');
+                        setProxyUrl(url);
+                        setProxyUrlInput(url);
+                      }}
+                      className="flex-1 text-xs font-mono"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestProxy}
+                      disabled={proxyStatus.type === 'testing'}
+                      className="shrink-0"
+                    >
+                      {proxyStatus.type === 'testing' ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      ) : null}
+                      Test
+                    </Button>
+                  </div>
+                  {proxyStatus.type !== 'idle' &&
+                    proxyStatus.type !== 'testing' && (
+                      <div
+                        className={`flex items-center gap-1.5 mt-2 text-xs ${
+                          proxyStatus.type === 'ok'
+                            ? 'text-green-500'
+                            : 'text-destructive'
+                        }`}
+                      >
+                        {proxyStatus.type === 'ok' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5" />
+                        )}
+                        {proxyStatus.message}
+                      </div>
+                    )}
                 </div>
               </TabsContent>
 
@@ -359,6 +550,13 @@ export default function VehicleLookup() {
             <Skeleton className="h-24 rounded-lg" />
             <Skeleton className="h-80 rounded-lg" />
           </div>
+        )}
+
+        {/* Vehicle Specs Card (from reg number lookup) */}
+        {vehicleSpecs && (
+          <StaggerItem>
+            <VehicleSpecsCard vehicle={vehicleSpecs} />
+          </StaggerItem>
         )}
 
         {/* Vehicle Report */}

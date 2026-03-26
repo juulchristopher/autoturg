@@ -21,12 +21,7 @@ import {
   listingsBySource,
 } from '@/lib/price-utils';
 import { decodeVIN } from '@/lib/vin-decoder';
-import {
-  getProxyUrl,
-  setProxyUrl,
-  testProxyHealth,
-  lookupByReg,
-} from '@/lib/vehicle-proxy';
+import { getProxyUrl, lookupByReg } from '@/lib/vehicle-proxy';
 import type { VehicleSpecs } from '@/types';
 import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
@@ -58,10 +53,7 @@ import {
   BarChart3,
   Layers,
   Clock,
-  CheckCircle2,
-  XCircle,
   Loader2,
-  Settings,
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import { baseChartOptions } from '@/lib/chart-config';
@@ -79,7 +71,7 @@ export default function VehicleLookup() {
     useData();
   const months = filteredMonths;
 
-  const [activeTab, setActiveTab] = useState<string>('vin');
+  const [activeTab, setActiveTab] = useState<string>('reg');
   const [vinInput, setVinInput] = useState('');
   const [vinError, setVinError] = useState('');
   const [selection, setSelection] = useState({
@@ -95,11 +87,6 @@ export default function VehicleLookup() {
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [vehicleSpecs, setVehicleSpecs] = useState<VehicleSpecs | null>(null);
-  const [proxyUrlInput, setProxyUrlInput] = useState(getProxyUrl());
-  const [proxyStatus, setProxyStatus] = useState<{
-    type: 'idle' | 'testing' | 'ok' | 'error';
-    message?: string;
-  }>({ type: 'idle' });
 
   // Clear specs card when switching away from reg tab
   useEffect(() => {
@@ -121,7 +108,7 @@ export default function VehicleLookup() {
 
     const currentProxy = getProxyUrl();
     if (!currentProxy) {
-      setRegError('Configure the vehicle proxy URL first (see setup below)');
+      setRegError('Vehicle proxy is not configured.');
       return;
     }
 
@@ -166,36 +153,6 @@ export default function VehicleLookup() {
     }
   }, [regInput]);
 
-  // Test proxy connection
-  const handleTestProxy = useCallback(async () => {
-    const url = proxyUrlInput.trim().replace(/\/+$/, '');
-    setProxyUrl(url);
-    setProxyUrlInput(url);
-
-    if (!url) {
-      setProxyStatus({ type: 'error', message: 'Enter a proxy URL first' });
-      return;
-    }
-
-    setProxyStatus({ type: 'testing' });
-
-    try {
-      const health = await testProxyHealth(url);
-      if (health.status === 'ok') {
-        const atvNote = health.atvConfigured
-          ? 'ATV API configured'
-          : 'Using mntstat.ee fallback';
-        setProxyStatus({ type: 'ok', message: `Connected — ${atvNote}` });
-      } else {
-        setProxyStatus({ type: 'error', message: 'Unexpected response' });
-      }
-    } catch (e: any) {
-      setProxyStatus({
-        type: 'error',
-        message: `Cannot reach proxy: ${e.message}`,
-      });
-    }
-  }, [proxyUrlInput]);
 
   // Make/model/variant options
   const makeOpts = useMemo(() => makeOptionsWithCounts(months), [months]);
@@ -439,66 +396,6 @@ export default function VehicleLookup() {
                   </Button>
                 </div>
 
-                {/* Proxy setup */}
-                <div className="mt-4 rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
-                    <Settings className="h-3.5 w-3.5" />
-                    Vehicle Proxy Setup
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Deploy{' '}
-                    <code className="font-mono text-[11px] bg-muted px-1 py-0.5 rounded">
-                      worker/vehicle-proxy.js
-                    </code>{' '}
-                    to Cloudflare Workers, or run{' '}
-                    <code className="font-mono text-[11px] bg-muted px-1 py-0.5 rounded">
-                      python fetch_vehicle.py --serve
-                    </code>{' '}
-                    locally. Then enter the proxy URL below.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      placeholder="https://autoturg-vehicle-proxy.your-subdomain.workers.dev"
-                      value={proxyUrlInput}
-                      onChange={(e) => setProxyUrlInput(e.target.value)}
-                      onBlur={() => {
-                        const url = proxyUrlInput.trim().replace(/\/+$/, '');
-                        setProxyUrl(url);
-                        setProxyUrlInput(url);
-                      }}
-                      className="flex-1 text-xs font-mono"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleTestProxy}
-                      disabled={proxyStatus.type === 'testing'}
-                      className="shrink-0"
-                    >
-                      {proxyStatus.type === 'testing' ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                      ) : null}
-                      Test
-                    </Button>
-                  </div>
-                  {proxyStatus.type !== 'idle' &&
-                    proxyStatus.type !== 'testing' && (
-                      <div
-                        className={`flex items-center gap-1.5 mt-2 text-xs ${
-                          proxyStatus.type === 'ok'
-                            ? 'text-green-500'
-                            : 'text-destructive'
-                        }`}
-                      >
-                        {proxyStatus.type === 'ok' ? (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5" />
-                        )}
-                        {proxyStatus.message}
-                      </div>
-                    )}
-                </div>
               </TabsContent>
 
               <TabsContent value="selector">

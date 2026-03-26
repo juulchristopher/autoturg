@@ -1,19 +1,18 @@
 /**
  * Client-side vehicle proxy helper.
  *
- * Talks to either:
- *   - Cloudflare Worker (worker/vehicle-proxy.js)
- *   - Python HTTP proxy (fetch_vehicle.py --serve)
- *
- * The proxy URL is stored in localStorage so the user only configures it once.
+ * Talks to the Cloudflare Worker (worker/vehicle-proxy.js).
+ * Proxy URL defaults to the deployed worker; can be overridden via
+ * localStorage for local development (python fetch_vehicle.py --serve).
  */
 
 import type { VehicleSpecs } from '@/types';
 
 const STORAGE_KEY = 'autoturg_proxy_url';
+const DEFAULT_PROXY_URL = 'https://autoturg-vehicle-proxy.juulchristopher.workers.dev';
 
 export function getProxyUrl(): string {
-  return localStorage.getItem(STORAGE_KEY) || '';
+  return localStorage.getItem(STORAGE_KEY) || DEFAULT_PROXY_URL;
 }
 
 export function setProxyUrl(url: string): void {

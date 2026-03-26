@@ -21,6 +21,7 @@ import {
   listingsBySource,
 } from '@/lib/price-utils';
 import { decodeVIN } from '@/lib/vin-decoder';
+import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import StatPill from '@/components/shared/StatPill';
 import InsightCard from '@/components/shared/InsightCard';
@@ -233,8 +234,10 @@ export default function VehicleLookup() {
     <main className="flex-1 overflow-y-auto">
       <Topbar title="Vehicle Lookup" subtitle="Decode VIN or search by make/model" />
 
-      <div className="px-6 py-6 space-y-6">
+      <PageTransition>
+        <StaggerList className="px-6 py-6 space-y-6">
         {/* Input card */}
+        <StaggerItem>
         <Card>
           <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -348,6 +351,7 @@ export default function VehicleLookup() {
             </Tabs>
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Loading state */}
         {loading && (
@@ -359,6 +363,7 @@ export default function VehicleLookup() {
 
         {/* Vehicle Report */}
         {report && reportData && !loading && (
+          <StaggerItem>
           <div className="space-y-6">
             {/* Hero */}
             <div>
@@ -882,18 +887,22 @@ export default function VehicleLookup() {
               </div>
             )}
           </div>
+          </StaggerItem>
         )}
 
         {/* Empty state */}
         {!report && !loading && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Search className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-sm">
-              Enter a VIN code or select a make/model above to view market data.
-            </p>
-          </div>
+          <StaggerItem>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Search className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p className="text-muted-foreground text-sm">
+                Enter a VIN code or select a make/model above to view market data.
+              </p>
+            </div>
+          </StaggerItem>
         )}
-      </div>
+        </StaggerList>
+      </PageTransition>
     </main>
   );
 }

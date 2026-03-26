@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from '@/context/DataContext';
 import { CATEGORY_LABELS } from '@/lib/data-utils';
+import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import CategoryTabs from '@/components/shared/CategoryTabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -56,8 +57,10 @@ export default function DataStatus() {
       <Topbar title="Data Status" subtitle="Data source overview and loaded months" />
       <CategoryTabs />
 
-      <div className="px-6 py-6 space-y-6">
+      <PageTransition>
+        <StaggerList className="px-6 py-6 space-y-6">
         {/* Schedule banner */}
+        <StaggerItem>
         <Card className="overflow-hidden" style={{ borderLeft: '3px solid #c8960a' }}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -83,8 +86,10 @@ export default function DataStatus() {
             </div>
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Loaded months section */}
+        <StaggerItem>
         <div>
           <div className="flex items-center gap-3 mb-4">
             <Badge variant="secondary" className="text-xs font-mono uppercase">
@@ -158,7 +163,9 @@ export default function DataStatus() {
             </div>
           )}
         </div>
-      </div>
+        </StaggerItem>
+        </StaggerList>
+      </PageTransition>
     </main>
   );
 }

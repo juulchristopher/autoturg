@@ -3,6 +3,7 @@ import { useData } from '@/context/DataContext';
 import { CATEGORY_LABELS } from '@/lib/data-utils';
 import { colorFor } from '@/lib/colors';
 import { CategoryKey } from '@/types';
+import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import CategoryTabs from '@/components/shared/CategoryTabs';
 import StatPill from '@/components/shared/StatPill';
@@ -140,143 +141,155 @@ export default function Overview() {
       />
       <CategoryTabs />
 
-      <div className="px-6 py-6 space-y-6">
-        {/* Stats grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatPill
-            label="Total Transactions"
-            value={total}
-            color="#c8960a"
-            icon={<TrendingUp className="h-5 w-5" />}
-          />
-          <StatPill
-            label="Top Make"
-            value={top5[0]?.[0] || '--'}
-            color="#2563eb"
-            subtitle={
-              top5[0]
-                ? `${top5[0][1].toLocaleString()} tx (${((top5[0][1] / total) * 100).toFixed(1)}%)`
-                : undefined
-            }
-            icon={<Award className="h-5 w-5" />}
-          />
-          <StatPill
-            label="Avg / Month"
-            value={avgPerMonth}
-            color="#16a34a"
-            icon={<Activity className="h-5 w-5" />}
-          />
-          <StatPill
-            label="Unique Makes"
-            value={uniqueMakesCount}
-            color="#7c3aed"
-            icon={<Layers className="h-5 w-5" />}
-          />
-        </div>
+      <PageTransition>
+        <StaggerList className="px-6 py-6 space-y-6">
+          {/* Stats grid */}
+          <StaggerItem>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatPill
+                label="Total Transactions"
+                value={total}
+                color="#c8960a"
+                icon={<TrendingUp className="h-5 w-5" />}
+              />
+              <StatPill
+                label="Top Make"
+                value={top5[0]?.[0] || '--'}
+                color="#2563eb"
+                subtitle={
+                  top5[0]
+                    ? `${top5[0][1].toLocaleString()} tx (${((top5[0][1] / total) * 100).toFixed(1)}%)`
+                    : undefined
+                }
+                icon={<Award className="h-5 w-5" />}
+              />
+              <StatPill
+                label="Avg / Month"
+                value={avgPerMonth}
+                color="#16a34a"
+                icon={<Activity className="h-5 w-5" />}
+              />
+              <StatPill
+                label="Unique Makes"
+                value={uniqueMakesCount}
+                color="#7c3aed"
+                icon={<Layers className="h-5 w-5" />}
+              />
+            </div>
+          </StaggerItem>
 
-        {/* Insight card */}
-        {sortedMakes.length >= 3 && (
-          <InsightCard>
-            <span
-              dangerouslySetInnerHTML={{
-                __html: `<strong>${top5[0][0]}</strong> leads the Estonian ${CATEGORY_LABELS[activeCategory].toLowerCase()} market with ${top5[0][1].toLocaleString()} transactions (${((top5[0][1] / total) * 100).toFixed(1)}%), followed by <strong>${top5[1][0]}</strong> and <strong>${top5[2][0]}</strong>.`,
-              }}
-            />
-          </InsightCard>
-        )}
+          {/* Insight card */}
+          {sortedMakes.length >= 3 && (
+            <StaggerItem>
+              <InsightCard>
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: `<strong>${top5[0][0]}</strong> leads the Estonian ${CATEGORY_LABELS[activeCategory].toLowerCase()} market with ${top5[0][1].toLocaleString()} transactions (${((top5[0][1] / total) * 100).toFixed(1)}%), followed by <strong>${top5[1][0]}</strong> and <strong>${top5[2][0]}</strong>.`,
+                  }}
+                />
+              </InsightCard>
+            </StaggerItem>
+          )}
 
-        {/* Trend line chart - full width */}
-        <ChartCard
-          title="Top 5 Makes -- Monthly Trend"
-          subtitle="Transaction volume over time"
-          className="col-span-full"
-        >
-          <TrendLineChart
-            labels={labels}
-            datasets={lineDatasets}
-            yLabel="Transactions"
-            height={320}
-          />
-        </ChartCard>
+          {/* Trend line chart - full width */}
+          <StaggerItem>
+            <ChartCard
+              title="Top 5 Makes -- Monthly Trend"
+              subtitle="Transaction volume over time"
+              className="col-span-full"
+            >
+              <TrendLineChart
+                labels={labels}
+                datasets={lineDatasets}
+                yLabel="Transactions"
+                height={320}
+              />
+            </ChartCard>
+          </StaggerItem>
 
-        {/* Charts grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ChartCard title="Market Share" subtitle="Top makes by volume">
-            <MarketShareDonut data={sortedMakes} maxSlices={10} height={300} />
-          </ChartCard>
+          {/* Charts grid */}
+          <StaggerItem>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ChartCard title="Market Share" subtitle="Top makes by volume">
+                <MarketShareDonut data={sortedMakes} maxSlices={10} height={300} />
+              </ChartCard>
 
-          <ChartCard
-            title="Monthly Totals"
-            subtitle={
-              activeCategory === 'koguTurg'
-                ? 'Stacked by category'
-                : 'Total transactions per month'
-            }
-          >
-            <MonthlyBarChart
-              labels={labels}
-              datasets={barDatasets}
-              stacked={activeCategory === 'koguTurg'}
-              yLabel="Transactions"
-              height={300}
-            />
-          </ChartCard>
-        </div>
+              <ChartCard
+                title="Monthly Totals"
+                subtitle={
+                  activeCategory === 'koguTurg'
+                    ? 'Stacked by category'
+                    : 'Total transactions per month'
+                }
+              >
+                <MonthlyBarChart
+                  labels={labels}
+                  datasets={barDatasets}
+                  stacked={activeCategory === 'koguTurg'}
+                  yLabel="Transactions"
+                  height={300}
+                />
+              </ChartCard>
+            </div>
+          </StaggerItem>
 
-        {/* Ranked makes table */}
-        <ChartCard title="All Makes Ranked" subtitle="Sorted by transaction volume">
-          <div className="overflow-x-auto -mx-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center">#</TableHead>
-                  <TableHead>Make</TableHead>
-                  <TableHead className="text-right">Transactions</TableHead>
-                  <TableHead className="text-right w-20">Share</TableHead>
-                  <TableHead className="w-40 hidden sm:table-cell">
-                    Distribution
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedMakes.map(([make, count], idx) => {
-                  const pct = total > 0 ? (count / total) * 100 : 0;
-                  const maxCount = sortedMakes[0]?.[1] || 1;
-                  const barWidth = (count / maxCount) * 100;
-
-                  return (
-                    <TableRow key={make}>
-                      <TableCell className="text-center font-mono text-xs text-muted-foreground">
-                        {idx + 1}
-                      </TableCell>
-                      <TableCell className="font-medium text-sm">
-                        {make}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">
-                        {count.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums">
-                        {pct.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${barWidth}%`,
-                              backgroundColor: colorFor(make, idx),
-                            }}
-                          />
-                        </div>
-                      </TableCell>
+          {/* Ranked makes table */}
+          <StaggerItem>
+            <ChartCard title="All Makes Ranked" subtitle="Sorted by transaction volume">
+              <div className="overflow-x-auto -mx-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12 text-center">#</TableHead>
+                      <TableHead>Make</TableHead>
+                      <TableHead className="text-right">Transactions</TableHead>
+                      <TableHead className="text-right w-20">Share</TableHead>
+                      <TableHead className="w-40 hidden sm:table-cell">
+                        Distribution
+                      </TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </ChartCard>
-      </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedMakes.map(([make, count], idx) => {
+                      const pct = total > 0 ? (count / total) * 100 : 0;
+                      const maxCount = sortedMakes[0]?.[1] || 1;
+                      const barWidth = (count / maxCount) * 100;
+
+                      return (
+                        <TableRow key={make}>
+                          <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell className="font-medium text-sm">
+                            {make}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm tabular-nums">
+                            {count.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums">
+                            {pct.toFixed(1)}%
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${barWidth}%`,
+                                  backgroundColor: colorFor(make, idx),
+                                }}
+                              />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </ChartCard>
+          </StaggerItem>
+        </StaggerList>
+      </PageTransition>
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -18,24 +19,29 @@ export default function StatPill({
   icon,
 }: StatPillProps) {
   return (
-    <Card
-      className={cn('relative overflow-hidden p-4')}
-      style={{ borderLeft: `3px solid ${color}` }}
+    <motion.div
+      whileHover={{ y: -2, boxShadow: '0 8px 24px -4px rgba(0,0,0,0.08)' }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      {icon && (
-        <div className="absolute right-3 top-3 text-muted-foreground/40">
-          {icon}
-        </div>
-      )}
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-bold font-mono tabular-nums">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </p>
-      {subtitle && (
-        <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
-      )}
-    </Card>
+      <Card
+        className={cn('relative overflow-hidden p-4 transition-colors')}
+        style={{ borderLeft: `3px solid ${color}` }}
+      >
+        {icon && (
+          <div className="absolute right-3 top-3 text-muted-foreground/40">
+            {icon}
+          </div>
+        )}
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-bold font-mono tabular-nums">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </p>
+        {subtitle && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+        )}
+      </Card>
+    </motion.div>
   );
 }

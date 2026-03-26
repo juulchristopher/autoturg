@@ -16,6 +16,9 @@ React SPA built with Vite + TypeScript + Tailwind CSS + shadcn/ui.
 - **Data pipeline:** `parse.py` (Python, openpyxl) — tries avaandmed.eesti.ee API first, falls back to URL-guessing
 - **Price pipeline:** `fetch_prices.py` (Python) — fetches from mobile.de, AutoScout24, auto24.ee; outputs prices.json
 - **Vehicle scraper:** `scrape_vehicle.py` (Python) — mntstat.ee lookup by reg number or filters (server-side only)
+- **Vehicle API client:** `fetch_vehicle.py` (Python) — ATV API client with mntstat.ee fallback, CLI + HTTP proxy server
+- **Vehicle CORS proxy:** `worker/vehicle-proxy.js` (Cloudflare Worker) — proxies vehicle lookups for client-side access
+- **Vehicle proxy lib:** `src/lib/vehicle-proxy.ts` — client-side proxy helper (localStorage URL, health check, reg lookup)
 - **VIN decode:** Client-side in `src/lib/vin-decoder.ts`, 70+ WMI codes
 - **Data:** `public/data.json` (transactions), `public/prices.json` (pricing)
 - **Hosting:** GitHub Pages (build output in `dist/`)
@@ -120,3 +123,4 @@ Short imperative messages. Examples from history:
 - Download pattern: `https://www.transpordiamet.ee/sites/default/files/documents/YYYY-MM/INFOLEHT-MMYYYY.xlsx`
 - avaandmed.eesti.ee Open Data API (API key via `OPENDATA_API_KEY` env var)
 - mntstat.ee public vehicle database (829K+ vehicles, scraped server-side)
+- Transpordiamet ATV API (abi.ria.ee/teabevarav/) — requires formal application + API key

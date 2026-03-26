@@ -74,6 +74,28 @@ export interface DepreciationDataPoint {
   sampleSize: number;
 }
 
+export interface VehicleSpecs {
+  source: 'atv' | 'mntstat' | 'unknown';
+  regNumber: string;
+  vin?: string;
+  make: string;
+  model: string;
+  variant?: string;
+  prodYear: number | null;
+  bodyType?: string;
+  color?: string;
+  fuelType?: string;
+  transmission?: string;
+  powerKw?: number | null;
+  engineCc?: number | null;
+  weightKg?: number | null;
+  county?: string;
+  status?: string;
+  firstRegDate?: string;
+  firstRegInEstonia?: string;
+  ownerChangeCount?: number | null;
+}
+
 export interface VINResult {
   isValid: boolean;
   error?: string;

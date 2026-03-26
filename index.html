@@ -952,6 +952,7 @@ body {
   .topbar { padding: 14px 16px; }
   .model-pick-grid { grid-template-columns: 1fr 1fr; }
   .price-cards-grid { grid-template-columns: 1fr; }
+  #depreciationStats { grid-template-columns: 1fr !important; }
   .price-box-plot { margin: 16px 8px 24px; }
   .price-box-label { font-size: 8px; }
   .price-source-row { grid-template-columns: 90px 1fr 70px; }
@@ -982,7 +983,7 @@ body {
 
 <div class="app">
   <!-- ─── SIDEBAR ─── -->
-  <aside class="sidebar">
+  <aside class="sidebar" role="navigation" aria-label="Main navigation">
     <div class="sidebar-logo">
       <div class="logo-flag">🇪🇪</div>
       <div class="logo-title">Autoturg Monitor</div>
@@ -1021,7 +1022,7 @@ body {
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <!-- ─── MAIN ─── -->
-  <div class="main">
+  <div class="main" role="main">
     <div class="topbar">
       <div style="display:flex;align-items:center">
         <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
@@ -1127,6 +1128,7 @@ body {
             <div class="model-pick-grid" id="modelPickGrid"></div>
             <div style="display:flex;gap:8px;margin-top:8px">
               <button class="btn" onclick="renderComparison()">📊 Update Charts</button>
+              <button class="btn" onclick="exportComparisonCSV()" style="font-size:11px;color:var(--muted)">⬇ Export CSV</button>
               <button class="btn" id="addSlotBtn" onclick="addComparisonSlot()" style="display:none">+ Add model</button>
             </div>
           </div>
@@ -1147,6 +1149,13 @@ body {
                   <canvas id="chartCmpByYear"></canvas>
                 </div>
               </div>
+            </div>
+
+            <!-- Depreciation comparison -->
+            <div class="card full" id="cmpDepreciationCard" style="display:none;margin-bottom:16px">
+              <div class="card-title">Depreciation comparison</div>
+              <div class="card-desc">Value retention over vehicle age across selected models</div>
+              <div class="chart-wrap h300"><canvas id="chartCmpDepreciation"></canvas></div>
             </div>
 
             <!-- Summary cards -->
@@ -1276,6 +1285,14 @@ body {
               <span id="priceCheckBadge"></span>
             </div>
             <div id="priceSourcesGrid" class="price-sources-grid" style="display:none"></div>
+          </div>
+
+          <!-- Depreciation Analysis -->
+          <div id="depreciationSection" class="card" style="display:none;margin-bottom:16px">
+            <div class="card-title" id="depreciationTitle">Depreciation analysis</div>
+            <div class="card-desc" id="depreciationDesc">How this model loses value over time</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:16px 0" id="depreciationStats"></div>
+            <div class="chart-wrap h240"><canvas id="chartDepreciation"></canvas></div>
           </div>
 
           <!-- Drill-down selector (shown when only make is known, e.g. after VIN decode) -->
@@ -2218,6 +2235,9 @@ function renderComparison() {
     }).join('');
     yearBody.innerHTML += `<tr><td style="font-family:var(--mono)">${yr}</td>${cells}</tr>`;
   });
+
+  // Depreciation comparison chart
+  renderComparisonDepreciation(activeSlots);
 }
 
 // ═══════════════════════════════════════════════
@@ -2882,6 +2902,9 @@ function showVehicleReport({ make, model, variant, year, vin }) {
 
   // Pricing intelligence
   renderPricingSection(make, model, variant, year);
+
+  // Depreciation analysis
+  renderDepreciationSection(make, model);
 }
 
 // ═══════════════════════════════════════════════
@@ -3113,6 +3136,242 @@ function renderPriceYearChart(allAggs, highlightYear) {
 }
 
 // ═══════════════════════════════════════════════
+// DEPRECIATION ANALYSIS
+// ═══════════════════════════════════════════════
+function computeDepreciation(make, model) {
+  const aggs = findPriceAggregatesForModel(make, model);
+  if (aggs.length < 3) return null;
+
+  const currentYear = 2026;
+  const points = aggs
+    .map(a => ({
+      ageYears: currentYear - a.prodYear,
+      medianPrice: a.medianPrice,
+      p25Price: a.p25Price,
+      p75Price: a.p75Price,
+      sampleSize: a.sampleSize
+    }))
+    .filter(p => p.ageYears > 0 && p.ageYears <= 15)
+    .sort((a, b) => a.ageYears - b.ageYears);
+
+  if (points.length < 3) return null;
+
+  // Annual depreciation: average year-over-year % drop
+  let totalDepr = 0, deprCount = 0;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    if (prev.medianPrice > 0 && curr.medianPrice > 0) {
+      const yearDiff = curr.ageYears - prev.ageYears;
+      if (yearDiff > 0) {
+        const annualPct = (1 - Math.pow(curr.medianPrice / prev.medianPrice, 1 / yearDiff)) * 100;
+        totalDepr += annualPct;
+        deprCount++;
+      }
+    }
+  }
+
+  const annualDepreciationPct = deprCount > 0 ? totalDepr / deprCount : 0;
+
+  // Value retention: price at oldest / price at newest
+  const newestPrice = points[0].medianPrice;
+  const oldestPrice = points[points.length - 1].medianPrice;
+  const totalRetention = newestPrice > 0 ? (oldestPrice / newestPrice * 100) : 0;
+
+  return { make, model, dataPoints: points, annualDepreciationPct, totalRetention };
+}
+
+function classifyRetention(annualPct) {
+  if (annualPct <= 8) return { label: 'Excellent', class: 'good', desc: 'Holds value very well' };
+  if (annualPct <= 11) return { label: 'Good', class: 'fair', desc: 'Average value retention' };
+  return { label: 'Poor', class: 'above', desc: 'Loses value quickly' };
+}
+
+function renderDepreciationSection(make, model) {
+  const section = document.getElementById('depreciationSection');
+  const statsEl = document.getElementById('depreciationStats');
+
+  if (!model || priceData.aggregates.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  const depr = computeDepreciation(make, model);
+  if (!depr) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  document.getElementById('depreciationTitle').textContent = `Depreciation analysis — ${make} ${model}`;
+  document.getElementById('depreciationDesc').textContent =
+    `Value change over ${depr.dataPoints.length} age brackets (${depr.dataPoints[0].ageYears}–${depr.dataPoints[depr.dataPoints.length-1].ageYears} years old)`;
+
+  const retention = classifyRetention(depr.annualDepreciationPct);
+
+  statsEl.innerHTML = `
+    <div class="price-card">
+      <div class="price-card-label">Annual depreciation</div>
+      <div class="price-card-value">${depr.annualDepreciationPct.toFixed(1)}%</div>
+      <div class="price-card-sub">average per year</div>
+    </div>
+    <div class="price-card range">
+      <div class="price-card-label">Value retention</div>
+      <div class="price-card-value"><span class="fair-price-badge ${retention.class}">${retention.label}</span></div>
+      <div class="price-card-sub">${retention.desc}</div>
+    </div>
+    <div class="price-card sample">
+      <div class="price-card-label">5-year residual</div>
+      <div class="price-card-value">${(100 - depr.annualDepreciationPct * 5).toFixed(0)}%</div>
+      <div class="price-card-sub">of original value after 5 years</div>
+    </div>
+  `;
+
+  // Depreciation chart
+  const labels = depr.dataPoints.map(p => p.ageYears + ' yr');
+  const medians = depr.dataPoints.map(p => p.medianPrice);
+  const p25s = depr.dataPoints.map(p => p.p25Price);
+  const p75s = depr.dataPoints.map(p => p.p75Price);
+
+  destroyChart('chartDepreciation');
+  new Chart(document.getElementById('chartDepreciation'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'P75',
+          data: p75s,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(46,160,67,0.08)',
+          fill: '+1',
+          pointRadius: 0
+        },
+        {
+          label: 'Median price',
+          data: medians,
+          borderColor: '#2ea043',
+          backgroundColor: 'rgba(46,160,67,0.1)',
+          borderWidth: 2,
+          fill: false,
+          pointRadius: 4,
+          pointBackgroundColor: '#2ea043',
+          tension: 0.3
+        },
+        {
+          label: 'P25',
+          data: p25s,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(46,160,67,0.08)',
+          fill: '-1',
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + formatEur(ctx.raw)
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'var(--mono)', size: 10 } } },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: {
+            font: { family: 'var(--mono)', size: 10 },
+            callback: v => (v / 1000).toFixed(0) + 'K €'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderComparisonDepreciation(slots) {
+  const card = document.getElementById('cmpDepreciationCard');
+  const filledSlots = slots.filter(s => s.make && s.model);
+
+  if (filledSlots.length === 0 || priceData.aggregates.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const datasets = [];
+  let hasData = false;
+
+  filledSlots.forEach((slot, i) => {
+    const depr = computeDepreciation(slot.make, slot.model);
+    if (!depr) return;
+    hasData = true;
+
+    const color = colorFor(slot.make, i);
+    datasets.push({
+      label: `${slot.make} ${slot.model}`,
+      data: depr.dataPoints.map(p => ({ x: p.ageYears, y: p.medianPrice })),
+      borderColor: color,
+      backgroundColor: color + '20',
+      borderWidth: 2,
+      fill: false,
+      pointRadius: 3,
+      pointBackgroundColor: color,
+      tension: 0.3
+    });
+  });
+
+  if (!hasData) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = 'block';
+
+  // Find all unique ages across all datasets
+  const allAges = new Set();
+  datasets.forEach(ds => ds.data.forEach(p => allAges.add(p.x)));
+  const sortedAges = [...allAges].sort((a, b) => a - b);
+
+  destroyChart('chartCmpDepreciation');
+  new Chart(document.getElementById('chartCmpDepreciation'), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'var(--mono)', size: 10 }, boxWidth: 12, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + formatEur(ctx.raw.y)
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Vehicle age (years)', font: { family: 'var(--mono)', size: 10 } },
+          grid: { display: false },
+          ticks: { font: { family: 'var(--mono)', size: 10 }, stepSize: 1 }
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          title: { display: true, text: 'Median price (€)', font: { family: 'var(--mono)', size: 10 } },
+          ticks: {
+            font: { family: 'var(--mono)', size: 10 },
+            callback: v => (v / 1000).toFixed(0) + 'K €'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
 // SYNC PAGE & STATUS
 // ═══════════════════════════════════════════════
 function updateSidebarStatus() {
@@ -3144,6 +3403,40 @@ function updateSyncPage() {
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${m.sheetUsed||'—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
+}
+
+// ═══════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════
+function exportComparisonCSV() {
+  const activeSlots = slots.filter(s => s && s.make);
+  if (activeSlots.length === 0) return;
+
+  const months = filteredMonths();
+  const headers = ['Month', ...activeSlots.map(s => {
+    let l = s.make;
+    if (s.model) l += ' ' + s.model;
+    if (s.variant) l += ' ' + s.variant;
+    return l;
+  })];
+
+  const rows = months.map(m => {
+    const cols = activeSlots.map(s => {
+      return m.rows
+        .filter(r => r.make === s.make && (!s.model || r.model === s.model) && (!s.variant || r.variant === s.variant))
+        .reduce((sum, r) => sum + r.count, 0);
+    });
+    return [m.label, ...cols];
+  });
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `autoturg-comparison-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ═══════════════════════════════════════════════

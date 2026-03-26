@@ -165,7 +165,7 @@ export function uniqueVariants(months: MonthEntry[], make: string, model: string
 export function modelMonthSeries(months: MonthEntry[], make: string, model: string, variant?: string): number[] {
   return months.map(m =>
     m.rows
-      .filter(r => r.make === make && r.model === model && (!variant || r.variant === variant))
+      .filter(r => r.make === make && (!model || r.model === model) && (!variant || r.variant === variant))
       .reduce((s, r) => s + r.count, 0)
   );
 }
@@ -175,7 +175,7 @@ export function prodYearDistribution(months: MonthEntry[], make: string, model: 
   const map = new Map<number, number>();
   for (const m of months) {
     for (const r of m.rows) {
-      if (r.make !== make || r.model !== model) continue;
+      if (r.make !== make || (model && r.model !== model)) continue;
       if (variant && r.variant !== variant) continue;
       if (r.prodYear) {
         map.set(r.prodYear, (map.get(r.prodYear) || 0) + r.count);

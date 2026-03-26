@@ -18,7 +18,7 @@ export default function Sidebar() {
   const monthCount = db.jarelturg.length;
 
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-card h-screen sticky top-0">
+    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r h-screen sticky top-0 bg-gradient-to-b from-card via-card to-primary/[0.03]">
       {/* Brand */}
       <div className="px-5 py-5">
         <Link to="/" className="flex items-center gap-2">

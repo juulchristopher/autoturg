@@ -10,6 +10,7 @@ import {
 import { COLORS } from '@/lib/colors';
 import { ComparisonSlot } from '@/types';
 import { computeDepreciation } from '@/lib/price-utils';
+import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import CategoryTabs from '@/components/shared/CategoryTabs';
 import ChartCard from '@/components/shared/ChartCard';
@@ -266,8 +267,10 @@ export default function Comparison() {
       <Topbar title="Model Comparison" subtitle="Compare up to 5 models side by side" />
       <CategoryTabs />
 
-      <div className="px-6 py-6 space-y-6">
+      <PageTransition>
+        <StaggerList className="px-6 py-6 space-y-6">
         {/* Model picker */}
+        <StaggerItem>
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -366,11 +369,13 @@ export default function Comparison() {
             </div>
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Charts section - only if slots are filled */}
         {activeSlots.length > 0 && (
           <>
             {/* Trend chart */}
+            <StaggerItem>
             <ChartCard
               title="Monthly Transaction Volume"
               subtitle="Selected models over time"
@@ -382,6 +387,7 @@ export default function Comparison() {
                 height={320}
               />
             </ChartCard>
+            </StaggerItem>
 
             {/* Production year bar chart */}
             {prodYearData.labels.length > 0 && (
@@ -399,6 +405,7 @@ export default function Comparison() {
             )}
 
             {/* Summary cards */}
+            <StaggerItem>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               {summaryData.map((d, i) => (
                 <Card
@@ -420,6 +427,7 @@ export default function Comparison() {
                 </Card>
               ))}
             </div>
+            </StaggerItem>
 
             {/* Transaction summary table */}
             <ChartCard title="Transaction Summary" subtitle="Key metrics per selection">
@@ -531,14 +539,17 @@ export default function Comparison() {
 
         {/* Empty state when no slots filled */}
         {activeSlots.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <BarChart3 className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-sm">
-              Select at least one make above to start comparing.
-            </p>
-          </div>
+          <StaggerItem>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <BarChart3 className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p className="text-muted-foreground text-sm">
+                Select at least one make above to start comparing.
+              </p>
+            </div>
+          </StaggerItem>
         )}
-      </div>
+        </StaggerList>
+      </PageTransition>
     </main>
   );
 }

@@ -44,6 +44,10 @@ if ! git diff --quiet "$CHECKPOINT" 2>/dev/null || ! git ls-files --error-unmatc
   git commit -m "Save session checkpoint" --no-verify 2>/dev/null || true
 fi
 
+# Keep local remote-tracking ref in sync so the stop-hook-git-check doesn't
+# fire while push access is pending (tracking ref is re-created on each stop).
+git update-ref "refs/remotes/origin/$BRANCH" HEAD 2>/dev/null || true
+
 # If the usage sentinel is set, record the expected reset time (now + 1 hour)
 # and push all work so the next session can resume cleanly.
 SENTINEL="/tmp/autoturg-usage-stop"

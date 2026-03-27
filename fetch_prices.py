@@ -214,62 +214,16 @@ class Auto24Parser(HTMLParser):
                 self.listings.append(self._cells)
 
 def fetch_auto24(make, model, year_from, year_to):
-    """Scrape auto24.ee listings. Returns list of ListingPrice dicts."""
-    # URL pattern: https://www.auto24.ee/kasutatud/nimekiri.php?bn=2&a=100&b=MAKE&ae=MODEL&af=YEAR_FROM&at=YEAR_TO
-    make_slug = make.lower().replace(" ", "+").replace("-", "+")
-    model_slug = model.lower().replace(" ", "+")
+    """Scrape auto24.ee listings. Returns list of ListingPrice dicts.
 
-    url = (
-        f"https://www.auto24.ee/kasutatud/nimekiri.php"
-        f"?bn=2&a=100&b={make_slug}&ae={model_slug}"
-        f"&af={year_from}&at={year_to}"
-    )
+    NOTE: auto24.ee and autoportaal.ee both block automated scraping:
+    - auto24.ee: Cloudflare bot protection (HTTP 403 on all requests)
+    - autoportaal.ee: JavaScript-rendered content (requires headless browser)
 
-    try:
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (autoturg-bot/1.0)"})
-        with urlopen(req, timeout=30) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-
-        listings = []
-        # Parse price and details from listing rows
-        # auto24.ee uses structured listing divs, not a table
-        # Look for price patterns and vehicle info
-        price_pattern = re.compile(r'(\d[\d\s]*)\s*€')
-        year_pattern = re.compile(r'\b(20\d{2})\b')
-        km_pattern = re.compile(r'(\d[\d\s]*)\s*km')
-
-        # Find listing blocks
-        blocks = re.findall(r'class="result-row"[^>]*>(.*?)</div>\s*</div>', html, re.DOTALL)
-
-        for block in blocks[:50]:
-            price_match = price_pattern.search(block)
-            year_match = year_pattern.search(block)
-            km_match = km_pattern.search(block)
-
-            if price_match:
-                price = int(price_match.group(1).replace(" ", ""))
-                prod_year = int(year_match.group(1)) if year_match else None
-                mileage = int(km_match.group(1).replace(" ", "")) if km_match else 0
-
-                listings.append({
-                    "source": "auto24.ee",
-                    "sourceId": "",
-                    "make": normalize_make(make),
-                    "model": normalize_model(model),
-                    "variant": "",
-                    "prodYear": prod_year,
-                    "mileage": mileage,
-                    "fuelType": "",
-                    "price": price,
-                    "currency": "EUR",
-                    "listedDate": date.today().isoformat(),
-                    "url": "https://www.auto24.ee"
-                })
-
-        return listings
-    except (URLError, HTTPError) as e:
-        print(f"  auto24.ee error for {make} {model}: {e}", file=sys.stderr)
-        return []
+    This function is a no-op stub until a partnership/API is established.
+    Run with --sample to generate representative pricing data.
+    """
+    return []
 
 
 # ═════════════════════════════════════════════════

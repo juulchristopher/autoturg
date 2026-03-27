@@ -2,6 +2,65 @@
 
 ---
 
+## Sprint 4: Auth Foundation
+> **Goal:** Users can create accounts and sign in. No content gating yet — all existing features remain free.
+> **Sprint dates:** 2026-03-28 — 2026-04-04
+> **References:** ADR-006, ADR-007
+
+### Task 4.1: Supabase project setup
+**Status:** TODO
+**Priority:** P0
+**Files:** `src/lib/supabase.ts`, `supabase/migrations/001_create_tables.sql`, `.env.example`
+
+**Scope:**
+- Create Supabase project (EU region: `eu-central-1`)
+- Enable email/password + Google OAuth
+- Create tables: `subscriptions`, `report_purchases` with RLS policies (see ADR-006)
+- Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to `.env` and GitHub Actions secrets
+- `src/lib/supabase.ts` — Supabase client initialization
+
+---
+
+### Task 4.2: AuthContext + useAuth hook
+**Status:** TODO
+**Priority:** P0
+**Files:** `src/context/AuthContext.tsx`, `src/App.tsx`
+
+**Scope:**
+- `AuthContext` — wraps app, holds `{ user, session, tier, signIn, signOut, loading }`
+- `useAuth()` hook exported from context
+- Calls `supabase.auth.getSession()` on mount, subscribes to auth state changes
+- Fetches subscription status from `subscriptions` table after login, exposes `tier: 'free' | 'subscriber'`
+- Wrap `<App>` with `<AuthProvider>` in `main.tsx`
+
+---
+
+### Task 4.3: Login/signup UI
+**Status:** TODO
+**Priority:** P0
+**Files:** `src/components/shared/LoginDialog.tsx`, `src/components/shared/UserMenu.tsx`
+
+**Scope:**
+- `LoginDialog` — modal with email/password (sign in / sign up tabs) + Google OAuth button
+- `UserMenu` — avatar + email dropdown in sidebar: sign-out, My Account, Pro badge if subscribed
+- Sidebar: show "Sign in" button (guest) or `UserMenu` (authenticated)
+- MobileNav: same sign-in / user menu logic
+
+---
+
+### Task 4.4: Privacy policy page
+**Status:** TODO
+**Priority:** P1
+**Files:** `src/pages/Privacy.tsx`, `src/App.tsx`
+
+**Scope:**
+- Static `/privacy` route with GDPR-compliant privacy policy content
+- Data collected: email only, stored in Supabase EU region (Frankfurt)
+- Link from login/signup form footer
+- Small text link at bottom of sidebar nav
+
+---
+
 ## Sprint 3: Pricing Intelligence & Data Completeness
 
 > **Goal:** Real Estonian pricing data, import category data, polished end-to-end flows.

@@ -65,6 +65,35 @@ gantt
     Reg number lookup live (no config)   :done, p6d, 2026-03-27, 1d
     auto24.ee scraper                    :crit, p6e, 2026-04-01, 14d
     mobile.de API credentials            :crit, p6f, 2026-04-01, 21d
+
+    section Phase 7: Monetization — Auth (Sprint 4)
+    Supabase project + tables            :active, p7a, 2026-03-28, 2d
+    AuthContext + useAuth hook           :p7b, after p7a, 2d
+    LoginDialog + UserMenu UI            :p7c, after p7b, 2d
+    Privacy policy page                  :p7d, after p7c, 1d
+    Milestone: auth live                 :milestone, p7m, 2026-04-04, 0d
+
+    section Phase 8: Monetization — Payments (Sprint 5)
+    Lemon Squeezy account + products     :p8a, 2026-04-05, 1d
+    Payment webhook edge function        :p8b, after p8a, 2d
+    PricingCard + Pricing page           :p8c, after p8b, 2d
+    AuthContext tier fetching            :p8d, after p8b, 1d
+    Milestone: payments live             :milestone, p8m, 2026-04-11, 0d
+
+    section Phase 9: Monetization — Content Gating (Sprint 6)
+    prices-summary.json (free tier)      :p9a, 2026-04-12, 1d
+    Supabase edge fn: prices + report    :p9b, after p9a, 3d
+    AuthGate + BlurredPreview components :p9c, after p9b, 2d
+    Gate VehicleLookup pricing sections  :p9d, after p9c, 1d
+    Gate Comparison model selectors      :p9e, after p9c, 1d
+    Milestone: paywall live              :milestone, p9m, 2026-04-25, 0d
+
+    section Phase 10: Monetization — Reports (Sprint 7)
+    Report page (interactive)            :p10a, 2026-04-26, 3d
+    PDF export                           :p10b, after p10a, 2d
+    My Reports page                      :p10c, after p10b, 1d
+    Sample report (BMW 3 Series free)    :p10d, after p10c, 1d
+    Milestone: reports live              :milestone, p10m, 2026-05-09, 0d
 ```
 
 ---

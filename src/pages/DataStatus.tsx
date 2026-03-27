@@ -4,7 +4,7 @@ import { CATEGORY_LABELS } from '@/lib/data-utils';
 import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
 import Topbar from '@/components/layout/Topbar';
 import CategoryTabs from '@/components/shared/CategoryTabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -15,12 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CalendarDays, ExternalLink } from 'lucide-react';
+import { CalendarDays, ExternalLink, BarChart2 } from 'lucide-react';
 
 const SKIP = ['KOKKU', 'TOTAL', 'ZUSAMMEN', 'SUM'];
 
 export default function DataStatus() {
-  const { filteredMonths, activeCategory, loading } = useData();
+  const { filteredMonths, activeCategory, loading, db } = useData();
   const months = filteredMonths;
 
   const tableData = useMemo(
@@ -38,6 +38,14 @@ export default function DataStatus() {
 
   const totalTxAll = tableData.reduce((s, m) => s + m.totalTx, 0);
   const totalRows = tableData.reduce((s, m) => s + m.rows, 0);
+
+  const officialRows = useMemo(() => {
+    const stats = db.officialStats;
+    if (!stats) return [];
+    return Object.entries(stats)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, s]) => ({ month, ...s }));
+  }, [db.officialStats]);
 
   if (loading) {
     return (
@@ -164,6 +172,58 @@ export default function DataStatus() {
           )}
         </div>
         </StaggerItem>
+
+        {/* Official Statistikaamet market totals */}
+        {officialRows.length > 0 && (
+        <StaggerItem>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-semibold">
+                  Official Market Totals — Statistikaamet TS322
+                </CardTitle>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Monthly passenger car first registrations in Estonia. Imported = total − new. Source:{' '}
+                <a href="https://andmed.stat.ee/et/stat/TS322" target="_blank" rel="noopener noreferrer"
+                   className="text-primary hover:underline inline-flex items-center gap-1">
+                  andmed.stat.ee <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
+            </CardHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Total registered</TableHead>
+                    <TableHead className="text-right">New cars</TableHead>
+                    <TableHead className="text-right">Imported (est.)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {officialRows.map((row) => (
+                    <TableRow key={row.month}>
+                      <TableCell className="font-mono text-sm">{row.month}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        {row.total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-500">
+                        {row.new.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums text-amber-500">
+                        {row.imported.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </StaggerItem>
+        )}
+
         </StaggerList>
       </PageTransition>
     </main>

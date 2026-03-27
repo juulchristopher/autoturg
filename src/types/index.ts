@@ -15,10 +15,17 @@ export interface MonthEntry {
   rows: TransactionRow[];
 }
 
+export interface OfficialMonthStat {
+  total: number;
+  new: number;
+  imported: number;
+}
+
 export interface Database {
   jarelturg: MonthEntry[];
   newCars: MonthEntry[];
   imports: MonthEntry[];
+  officialStats?: Record<string, OfficialMonthStat>;
 }
 
 export interface PriceAggregate {

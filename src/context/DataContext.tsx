@@ -43,7 +43,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Handle legacy format
         const data: Database = raw.jarelturg
           ? raw
-          : { jarelturg: raw.months || [], newCars: [], imports: [] };
+          : { jarelturg: raw.months || [], newCars: [], imports: [], officialStats: {} };
         // Sort each category
         for (const key of ['jarelturg', 'newCars', 'imports'] as const) {
           data[key].sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month));

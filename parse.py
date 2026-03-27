@@ -5,7 +5,7 @@ Fetch the latest Transpordiamet infoleht xlsx and parse all 3 market categories
 Merges new month into existing data.json so history accumulates.
 """
 
-import json, re, sys, os
+import json, re, sys, os, subprocess
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.request import urlopen, Request
@@ -226,6 +226,67 @@ def parse_sheet(ws) -> list:
     return rows_out
 
 
+def fetch_statistikaamet_ts322(years: list) -> dict:
+    """Fetch monthly passenger car first-registration totals from Statistikaamet TS322.
+
+    Returns dict: { "YYYY-MM": { "total": int, "new": int, "imported": int }, ... }
+
+    Codes:
+      Sõiduki tüüp "1" = Sõiduautod (passenger cars)
+      Näitaja "1" = Registreeritud sõidukid (all first registrations)
+      Näitaja "2" = Registreeritud uued sõidukid (brand new only)
+      imported ≈ total - new
+    """
+    url = "https://andmed.stat.ee/api/v1/et/stat/TS322"
+    months_out = {}
+
+    for year in years:
+        payload = {
+            "query": [
+                {"code": "S\u00f5iduki t\u00fc\u00fcp", "selection": {"filter": "item", "values": ["1"]}},
+                {"code": "Aasta", "selection": {"filter": "item", "values": [str(year)]}},
+                {"code": "N\u00e4itaja", "selection": {"filter": "item", "values": ["1", "2"]}},
+                {"code": "Kuu", "selection": {"filter": "item",
+                    "values": ["1","2","3","4","5","6","7","8","9","10","11","12"]}},
+            ],
+            "response": {"format": "json"},
+        }
+        body = json.dumps(payload, ensure_ascii=False)
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "-X", "POST", url,
+                 "-H", "Content-Type: application/json; charset=utf-8",
+                 "--data", body],
+                capture_output=True, text=True, timeout=20,
+            )
+            if not result.stdout or result.stdout.strip() == "Bad Request":
+                print(f"  TS322: no data for {year}", file=sys.stderr)
+                continue
+            d = json.loads(result.stdout)
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
+            print(f"  TS322 error for {year}: {e}", file=sys.stderr)
+            continue
+
+        for row in d.get("data", []):
+            _, yr, indicator, month = row["key"]
+            raw = row["values"][0]
+            if raw in ("..", "", None):
+                continue
+            val = int(raw)
+            key = f"{yr}-{int(month):02d}"
+            months_out.setdefault(key, {"total": 0, "new": 0})
+            if indicator == "1":
+                months_out[key]["total"] = val
+            elif indicator == "2":
+                months_out[key]["new"] = val
+
+    # Compute imported = total - new
+    for key, m in months_out.items():
+        m["imported"] = max(0, m["total"] - m["new"])
+
+    return months_out
+
+
 def load_data() -> dict:
     if DATA_FILE.exists():
         with open(DATA_FILE) as f:
@@ -242,8 +303,9 @@ def load_data() -> dict:
         data.setdefault("jarelturg", [])
         data.setdefault("newCars", [])
         data.setdefault("imports", [])
+        data.setdefault("officialStats", {})
         return data
-    return {"jarelturg": [], "newCars": [], "imports": []}
+    return {"jarelturg": [], "newCars": [], "imports": [], "officialStats": {}}
 
 
 def save_data(data: dict):
@@ -364,6 +426,16 @@ def main():
 
     if not fetch_month(month, year):
         sys.exit(1)
+
+    # Fetch Statistikaamet TS322 official monthly totals (no auth required)
+    print("Fetching Statistikaamet TS322 official registration totals...")
+    years_to_fetch = list(range(2024, today.year + 1))
+    ts322 = fetch_statistikaamet_ts322(years_to_fetch)
+    if ts322:
+        data = load_data()
+        data["officialStats"] = ts322
+        save_data(data)
+        print(f"  TS322: {len(ts322)} months of official totals saved")
 
 
 if __name__ == "__main__":

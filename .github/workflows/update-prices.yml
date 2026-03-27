@@ -1,0 +1,38 @@
+name: Update pricing data
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
+  workflow_dispatch: {}     # allow manual trigger
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch and update prices
+        env:
+          MOBILE_DE_USER: ${{ secrets.MOBILE_DE_USER }}
+          MOBILE_DE_PASS: ${{ secrets.MOBILE_DE_PASS }}
+          AUTOSCOUT24_CLIENT_ID: ${{ secrets.AUTOSCOUT24_CLIENT_ID }}
+          AUTOSCOUT24_CLIENT_SECRET: ${{ secrets.AUTOSCOUT24_CLIENT_SECRET }}
+        run: python fetch_prices.py
+
+      - name: Commit prices.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add prices.json
+          if git diff --cached --quiet; then
+            echo "No changes to prices.json"
+          else
+            git commit -m "Update pricing data ($(date +%Y-%m-%d))"
+            git push
+          fi

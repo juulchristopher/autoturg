@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TrendingUp, Award, Activity, Layers } from 'lucide-react';
+import { TrendingUp, Award, Activity, Layers, CalendarCheck } from 'lucide-react';
 
 const SKIP = ['KOKKU', 'TOTAL', 'ZUSAMMEN', 'SUM'];
 
@@ -98,6 +98,17 @@ export default function Overview() {
     months.length > 0 ? Math.round(total / months.length) : 0;
   const uniqueMakesCount = sortedMakes.length;
 
+  // Latest month label and MoM change
+  const latestMonth = months[months.length - 1];
+  const prevMonth = months[months.length - 2];
+  const latestTotal = latestMonth
+    ? latestMonth.rows.filter(r => !SKIP.includes(r.make)).reduce((s, r) => s + r.count, 0)
+    : 0;
+  const prevTotal = prevMonth
+    ? prevMonth.rows.filter(r => !SKIP.includes(r.make)).reduce((s, r) => s + r.count, 0)
+    : 0;
+  const momChange = prevTotal > 0 ? ((latestTotal - prevTotal) / prevTotal) * 100 : null;
+
   if (loading) {
     return (
       <main className="flex-1 overflow-y-auto">
@@ -137,7 +148,7 @@ export default function Overview() {
     <main className="flex-1 overflow-y-auto">
       <Topbar
         title="Monthly Overview"
-        subtitle={`${CATEGORY_LABELS[activeCategory]} -- ${months.length} months loaded`}
+        subtitle={`${CATEGORY_LABELS[activeCategory]} · ${months.length} months · Data through ${latestMonth?.label ?? '—'}`}
       />
       <CategoryTabs />
 
@@ -170,10 +181,15 @@ export default function Overview() {
                 icon={<Activity className="h-5 w-5" />}
               />
               <StatPill
-                label="Unique Makes"
-                value={uniqueMakesCount}
+                label="Latest Month"
+                value={latestTotal.toLocaleString()}
                 color="#7c3aed"
-                icon={<Layers className="h-5 w-5" />}
+                subtitle={
+                  momChange !== null
+                    ? `${momChange >= 0 ? '+' : ''}${momChange.toFixed(1)}% vs prev month`
+                    : latestMonth?.label
+                }
+                icon={<CalendarCheck className="h-5 w-5" />}
               />
             </div>
           </StaggerItem>

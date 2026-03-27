@@ -11,7 +11,7 @@
 ---
 
 ### Task 3.1: auto24.ee listing scraper
-**Status:** TODO
+**Status:** BLOCKED
 **Priority:** P0
 **Files:** `fetch_prices.py`
 
@@ -25,7 +25,7 @@
 ---
 
 ### Task 3.2: Statistikaamet TS322 import data
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Files:** `parse.py`, `public/data.json`
 
@@ -39,7 +39,7 @@
 ---
 
 ### Task 3.3: End-to-end VIN flow verification
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Files:** `src/pages/VehicleLookup.tsx`, `src/lib/vin-decoder.ts`
 
@@ -52,7 +52,7 @@
 ---
 
 ### Task 3.4: Overview page enhancements
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Files:** `src/pages/Overview.tsx`
 
@@ -64,7 +64,7 @@
 ---
 
 ### Task 3.5: Update all documentation
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Files:** `docs/rpd.md`, `docs/architecture.md`, `docs/buildplan.md`, `CLAUDE.md`
 

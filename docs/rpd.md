@@ -65,13 +65,13 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 | FR-004 | Ingest new-car registration data from Transpordiamet infoleht | P1 | DONE |
 | FR-005 | Ingest import registration data from Transpordiamet infoleht | P1 | Blocked — infoleht has no import sheet |
 | FR-006 | Integrate Estonian Open Data Portal API for infoleht data | P2 | DONE — try_opendata_api() with fallback to URL-guessing |
-| FR-007 | Integrate mobile.de API for European market pricing | P3 | Planned |
-| FR-008 | Integrate AutoScout24 API for European market pricing | P3 | Planned |
-| FR-009 | Collect auto24.ee listing data for Estonian local pricing | P3 | Planned |
+| FR-007 | Integrate mobile.de API for European market pricing | P3 | Planned — needs API credentials |
+| FR-008 | Integrate AutoScout24 API for European market pricing | P3 | Planned — needs API credentials |
+| FR-009 | Collect auto24.ee listing data for Estonian local pricing | P3 | Blocked — Cloudflare bot protection; autoportaal.ee is JS-rendered |
 | FR-010 | VIN decode and vehicle lookup | P2 | DONE — client-side decodeVIN() with 70+ WMI codes |
 | FR-011 | Registration number lookup via AVP/mntstat.ee | P2 | DONE — scrape_vehicle.py via mntstat.ee (server-side) |
-| FR-012 | Generate depreciation curves from historical pricing data | P4 | Planned |
-| FR-013 | Price range visualization (box plots or similar) | P3 | Planned |
+| FR-012 | Generate depreciation curves from historical pricing data | P4 | DONE — DepreciationChart in VehicleLookup + Comparison |
+| FR-013 | Price range visualization (box plots or similar) | P3 | DONE — PriceBoxPlot in VehicleLookup with check-a-price feature |
 | FR-014 | Make/model/variant selector input | P0 | DONE |
 | FR-015 | VIN input field with decode | P2 | DONE — Vehicle Lookup page, VIN tab |
 | FR-016 | Registration number input field | P2 | DONE — Vehicle Lookup page, Reg tab (UI ready, pending data access) |

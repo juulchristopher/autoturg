@@ -57,6 +57,14 @@ gantt
     Mobile responsive + hamburger menu  :done, p5a, 2026-03-26, 1d
     Performance (lazy load, defer)      :done, p5b, 2026-03-26, 1d
     Milestone: polish complete          :milestone, p5m, 2026-03-26, 0d
+
+    section Phase 6: Data Completeness (Sprint 3)
+    Statistikaamet TS322 official totals :done, p6a, 2026-03-27, 1d
+    Overview freshness badge + MoM stat  :done, p6b, 2026-03-27, 1d
+    Cloudflare Worker proxy deployed     :done, p6c, 2026-03-27, 1d
+    Reg number lookup live (no config)   :done, p6d, 2026-03-27, 1d
+    auto24.ee scraper                    :crit, p6e, 2026-04-01, 14d
+    mobile.de API credentials            :crit, p6f, 2026-04-01, 21d
 ```
 
 ---

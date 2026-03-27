@@ -2,7 +2,7 @@
 
 > System components, data flow, technology decisions, and integration design.
 
-**Last updated:** 2026-03-26
+**Last updated:** 2026-03-27
 
 ---
 
@@ -33,10 +33,11 @@ flowchart TB
         VDB["vehicle DB\n(lookup cache)"]
     end
 
-    subgraph frontend["Frontend"]
-        SPA["index.html\n(SPA)"]
-        CJS["Chart.js"]
-        LS["localStorage"]
+    subgraph frontend["Frontend (React SPA)"]
+        REACT["React 18 + Vite\nsrc/pages/*, src/components/*"]
+        CJS["Chart.js 4.4\nvia react-chartjs-2"]
+        CTX["DataContext\n(global state)"]
+        LS["localStorage\n(proxy URL override)"]
     end
 
     subgraph hosting["Hosting"]
@@ -57,7 +58,8 @@ flowchart TB
     API_PROXY --> PJ
     API_PROXY --> VDB
     SCRAPER --> PJ
-    DJ --> SPA
+    STAT["Statistikaamet\nandmed.stat.ee"] --> PP
+    DJ --> REACT
     PJ --> SPA
     VDB --> SPA
     SPA --> CJS

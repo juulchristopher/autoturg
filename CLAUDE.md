@@ -124,3 +124,53 @@ Short imperative messages. Examples from history:
 - avaandmed.eesti.ee Open Data API (API key via `OPENDATA_API_KEY` env var)
 - mntstat.ee public vehicle database (829K+ vehicles, scraped server-side)
 - Transpordiamet ATV API (abi.ria.ee/teabevarav/) — requires formal application + API key
+
+## Agent Team
+
+Four persistent agents, each with their own sub-instructions in `.claude/agents/`:
+
+| Agent | Model | When to use |
+|-------|-------|-------------|
+| **frontend** | Sonnet 4.6 | React components, UI, styling, charts |
+| **data** | Sonnet 4.6 | Python pipelines, data.json, prices.json |
+| **architect** | Opus 4.6 | Architecture decisions, schema design, sprint planning |
+| **qa** | Sonnet 4.6 | Build validation, code review, docs updates |
+
+### Token efficiency rules
+
+- **Default model:** `claude-sonnet-4-6` (configured in `.claude/settings.json`)
+- **Use Opus only for:** architectural decisions with major trade-offs, complex cross-cutting refactors, dual-tier monetization design
+- **Spawn parallel agents** when tasks are independent (e.g., frontend + data work in same sprint)
+- **Always pass `model: "sonnet"`** in Agent tool calls unless Opus is explicitly warranted
+- **Keep agent prompts focused** — don't dump full files into context; reference specific paths
+
+### Usage limit monitoring (90% auto-stop)
+
+When plan usage reaches **90%**, Claude must:
+1. Commit and push all in-progress work
+2. Save the session checkpoint: `bash /home/user/autoturg/.claude/hooks/on-stop.sh`
+3. Activate the usage sentinel: `touch /tmp/autoturg-usage-stop`
+4. Stop the session — the `PreToolUse` hook will block all further tool calls
+
+**Trigger conditions** (any one is sufficient):
+- The user says usage is at or above 90%
+- The Claude Code status bar shows ≥ 90%
+- You receive a rate-limit or quota error from the API
+
+**Resume**: When usage resets (typically 1 hour), remove the sentinel:
+`rm /tmp/autoturg-usage-stop`
+
+The next session will auto-read `.session-checkpoint.md` via `on-session-start.sh` and continue from the sprint backlog.
+
+### Context window + session continuity
+
+- When a session ends (context full or manual stop), a checkpoint is auto-saved to `.session-checkpoint.md`
+- The next session reads the checkpoint via `on-session-start.sh` hook and resumes from sprint backlog
+- Hooks are in `.claude/hooks/` and configured in `.claude/settings.json`
+
+### Web access (claude.ai/code)
+
+Connect the `juulchristopher/autoturg` repo to claude.ai/code for browser-based agent sessions:
+1. Go to claude.ai/code → Connect repository → `juulchristopher/autoturg`
+2. Sessions start with `on-session-start.sh` which restores context and installs deps
+3. All agent roles work identically in web and CLI sessions

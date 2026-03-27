@@ -1,636 +1,449 @@
-# Sprint 2: UI Overhaul + Vehicle Lookup + API Integration
+# Sprint 2: React Foundation → Shippable Product
 
-> **Goal:** Transform from admin dashboard to consumer product. Add Vehicle Lookup as hero feature. Replace URL-guessing with API. Fix critical UX issues.
-> **Sprint dates:** 2026-03-25 — 2026-04-08
-> **References:** Phase 2 in `buildplan.md`, `docs/ui-review.md`
-
----
-
-## Priority Order
-
-Builder should work through tasks in this order. Tasks marked ⚡ are quick wins.
-
-1. **Task 2.1** — Fix scroll bug ⚡
-2. **Task 2.2** — Move categories from sidebar to in-page segment control
-3. **Task 2.3** — Add timeline preset buttons ⚡
-4. **Task 2.4** — Build Vehicle Lookup page (hero feature)
-5. **Task 2.5** — Integrate andmed.eesti.ee OpenData API
-6. **Task 2.6** — UI polish pass
-7. **Task 2.7** — Update documentation
+> **Goal:** Merge the ATV API branch, fix data gaps, add normalization, and polish the UI so the React app is ready for real users.
+> **Sprint dates:** 2026-03-27 — 2026-04-10
+> **Stack:** React + Vite + TypeScript + shadcn/ui + Tailwind
+> **Model:** claude-sonnet-4-6 (all tasks)
 
 ---
 
-## Task 2.1: Fix scroll bug ⚡
+## Current State (as of 2026-03-27)
+
+- `main` = React app, live on GitHub Pages ✅
+- `atv-integration-react` = 2 commits ahead of main, adds VehicleSpecsCard + Python proxy + better worker structure
+- GitHub Actions already builds with `npm run build` → `dist/` ✅
+- ATV API + Cloudflare Worker already on main ✅
+- Import data = 0 months ❌
+- prices.json = empty/stub ❌
+- BMW model names = engine codes (116D not "1 Series") ❌
+
+---
+
+## Task Order
+
+1. **Task 2.1** — Merge atv-integration-react → main
+2. **Task 2.2** — Fix Import data parsing (0 → real data)
+3. **Task 2.3** — Data normalization (BMW series names)
+4. **Task 2.4** — Timeline preset buttons
+5. **Task 2.5** — UI polish pass
+
+---
+
+## Task 2.1: Merge atv-integration-react → main
 
 **Status:** NOT STARTED
-**Priority:** P0 — blocks all page content below the fold
-**Files:** `index.html` (CSS)
+**Priority:** P0 — unblocks everything
+**Files:** `src/components/shared/VehicleSpecsCard.tsx`, `src/pages/VehicleLookup.tsx`, `worker/`, `fetch_vehicle.py`
 
-**The bug:** `.main` element (line ~107) lacks `overflow-y: auto` and `height: 100vh`. Content below the first viewport fold is unreachable.
+### What this branch adds (verified via diff)
 
-**Fix:**
-```css
-.main {
-  flex: 1;
-  min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;      /* ADD THIS */
-  height: 100vh;         /* ADD THIS */
-}
-```
+| File | What it adds |
+|------|-------------|
+| `src/components/shared/VehicleSpecsCard.tsx` | Displays ATV API vehicle data (make, model, year, fuel, odometer, colour, etc.) in a clean card |
+| `src/pages/VehicleLookup.tsx` | Proxy health test UI, status indicators (checking/ok/error), settings panel for proxy URL |
+| `worker/vehicle-proxy.js` | Cloudflare Worker in proper `worker/` directory (main has it misplaced at `src/lib/`) |
+| `worker/wrangler.toml` | Wrangler config for Cloudflare deployment |
+| `fetch_vehicle.py` | Python local proxy alternative (for development/testing without Cloudflare) |
+| `src/lib/vehicle-proxy.ts` | Enhanced with `testProxyHealth()` and `setProxyUrl()` functions |
+| `src/types/index.ts` | Adds `VehicleSpecs` type |
 
-**Acceptance criteria:**
-- All pages scroll to show full content
-- Vehicle Lookup shows production year chart below the monthly chart
-- Overview page scrolls through the full makes table
+### Steps
 
----
+1. From the `atv-integration-react` worktree (`/Users/christopherjuul/Desktop/autoturg/.claude/worktrees/hungry-spence`):
+   ```bash
+   git push -u origin atv-integration-react
+   gh pr create --title "Add VehicleSpecsCard + Python proxy + worker directory structure" \
+     --body "Adds VehicleSpecsCard component, proper worker/ directory, Python local proxy for dev, and enhanced proxy health testing UI." \
+     --base main
+   ```
+2. Tag the PR for PM review
+3. Do NOT squash — keep the 2 commits clean
 
-## Task 2.2: Move categories from sidebar to in-page segment control
-
-**Status:** NOT STARTED
-**Priority:** P0 — fundamental UX improvement
-**Files:** `index.html` (HTML, CSS, JS)
-
-**Problem:** Category buttons (Järelturg, Uued sõidukid, Import, Kogu turg) are in the sidebar as navigation buttons. This confuses users — they think switching category navigates somewhere. Categories should be a **data filter** within each page, not navigation.
-
-**What to do:**
-
-### A. Remove category section from sidebar
-Remove the entire `Category` nav-section (lines 648–662). The sidebar should only have:
-- Logo
-- Views: Monthly Overview, Model Comparison, Vehicle Lookup
-- (Move "Sync & Upload" to a small icon/link at sidebar bottom, not a full nav button)
-
-### B. Add segment control to each page
-Add a **pill-style segment control** below the timeline bar, inside each page's content area. It replaces the sidebar categories.
-
-**HTML pattern:**
-```html
-<div class="category-tabs">
-  <button class="cat-tab active" data-cat="jarelturg" onclick="switchCategory('jarelturg')">
-    Järelturg
-  </button>
-  <button class="cat-tab" data-cat="newCars" onclick="switchCategory('newCars')">
-    Uued sõidukid
-  </button>
-  <button class="cat-tab" data-cat="imports" onclick="switchCategory('imports')">
-    Import
-  </button>
-  <button class="cat-tab" data-cat="koguTurg" onclick="switchCategory('koguTurg')">
-    Kogu turg
-  </button>
-</div>
-```
-
-**CSS for segment control:**
-```css
-.category-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--s3);
-  padding: 3px;
-  border-radius: 8px;
-  width: fit-content;
-  margin-bottom: 20px;
-}
-.cat-tab {
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 7px 16px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.cat-tab.active {
-  background: var(--s1);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-.cat-tab:hover:not(.active) {
-  color: var(--text);
-}
-```
-
-### C. Update `switchCategory()` function
-- Instead of toggling `.cat-btn` in sidebar, toggle `.cat-tab.active` on the in-page tabs
-- **Do NOT clear comparison slots** when switching category (current behavior resets all 5 slots — that's destructive)
-- Keep the category in sync across pages: when you switch category on Overview, the same category should be active when you navigate to Comparison
-
-### D. Place the segment control
-- **Overview page:** Place it right above the stats-grid (first thing user sees)
-- **Comparison page:** Place it above the model picker grid
-- **Vehicle Lookup page:** Not needed (vehicle lookup is cross-category)
-
-**Acceptance criteria:**
-- Sidebar has no "Category" section
-- Each page (overview, comparison) has a pill-style category switcher at the top
-- Switching category re-renders that page's data
-- Category stays synced across pages
-- Sidebar is narrower/cleaner with just Views + logo
+### Acceptance criteria
+- PR created and ready for merge
+- `VehicleSpecsCard` renders real ATV API data (make, model, year, fuel type, odometer)
+- `worker/` directory contains `vehicle-proxy.js` and `wrangler.toml`
+- `src/lib/vehicle-proxy.js` (old misplaced location) removed if duplicated
 
 ---
 
-## Task 2.3: Add timeline preset buttons ⚡
+## Task 2.2: Fix Import data parsing
 
 **Status:** NOT STARTED
-**Priority:** P1 — quick usability win
-**Files:** `index.html` (HTML, JS)
-
-**What to do:**
-
-Add preset buttons next to the existing "All" button in the timeline bar (line ~707):
-
-```html
-<button class="btn timeline-preset" onclick="setTimelinePreset('lastMonth')">Last month</button>
-<button class="btn timeline-preset" onclick="setTimelinePreset('thisYear')">This year</button>
-<button class="btn timeline-preset" onclick="setTimelinePreset('lastYear')">Last year</button>
-<button class="btn timeline-preset active" onclick="resetTimeline()">All</button>
-```
-
-**JS function:**
-```javascript
-function setTimelinePreset(preset) {
-  const months = activeMonths();
-  if (!months.length) return;
-
-  const now = new Date();
-  let fromYear, fromMonth, toYear, toMonth;
-
-  if (preset === 'lastMonth') {
-    // Previous month
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    fromYear = toYear = d.getFullYear();
-    fromMonth = toMonth = d.getMonth() + 1;
-  } else if (preset === 'thisYear') {
-    fromYear = toYear = now.getFullYear();
-    fromMonth = 1;
-    toMonth = now.getMonth() + 1; // current month (or latest available)
-  } else if (preset === 'lastYear') {
-    fromYear = toYear = now.getFullYear() - 1;
-    fromMonth = 1;
-    toMonth = 12;
-  }
-
-  // Find closest available months in data
-  timelineFrom = findClosestMonth(months, fromYear, fromMonth);
-  timelineTo = findClosestMonth(months, toYear, toMonth);
-
-  // Update select elements
-  document.getElementById('timelineFrom').value = timelineFrom;
-  document.getElementById('timelineTo').value = timelineTo;
-
-  // Highlight active preset
-  document.querySelectorAll('.timeline-preset').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-
-  applyTimeline();
-}
-```
-
-**Style the presets** with the same pattern as the existing "All" button, but slightly smaller. Active preset gets a subtle highlight.
-
-**Acceptance criteria:**
-- "Last month", "This year", "Last year", "All" buttons visible in timeline bar
-- Each preset correctly filters the data
-- Active preset is visually highlighted
-- Works correctly even when data doesn't cover the full range (e.g., "This year" when only Jan–Feb data exists)
-
----
-
-## Task 2.4: Build Vehicle Lookup page (hero feature)
-
-**Status:** NOT STARTED
-**Priority:** P0 — the core user-facing feature
-**Files:** `index.html` (HTML, CSS, JS)
-
-> **Important:** This is the most important page of the product. It should feel like getting a personalized car market report, not browsing a data table.
-
-### A. Add the page structure
-
-Add new page `page-vehicle` and sidebar nav button (between Model Comparison and Sync & Upload):
-
-```html
-<button class="nav-btn view-btn" onclick="showPage('vehicle')">
-  <span class="nav-icon">🔍</span> Vehicle Lookup
-</button>
-```
-
-### B. Input section — 3 tabs
-
-```html
-<div class="vehicle-input-section">
-  <h2 class="section-title">Find your vehicle</h2>
-  <p class="section-sub">Enter a VIN code, registration number, or select make & model</p>
-
-  <div class="input-tabs">
-    <button class="input-tab active" data-tab="vin">VIN Code</button>
-    <button class="input-tab" data-tab="reg">Reg Number</button>
-    <button class="input-tab" data-tab="manual">Make / Model</button>
-  </div>
-
-  <!-- VIN tab -->
-  <div class="input-panel active" id="panel-vin">
-    <input id="vinInput" placeholder="e.g. WBAPH5C55BA123456" maxlength="17" />
-    <button onclick="lookupVIN()">Decode</button>
-  </div>
-
-  <!-- Reg tab -->
-  <div class="input-panel" id="panel-reg">
-    <input id="regInput" placeholder="e.g. 123 ABC" />
-    <button onclick="lookupReg()">Look up</button>
-    <p class="coming-soon">Registration lookup available Q2 2026</p>
-  </div>
-
-  <!-- Manual tab -->
-  <div class="input-panel" id="panel-manual">
-    <!-- Reuse combobox pattern: Make → Model → Configuration -->
-  </div>
-</div>
-```
-
-### C. Vehicle report section (the key part)
-
-After the user enters a vehicle, show a **personalized report**:
-
-```html
-<div id="vehicleReport" style="display:none">
-
-  <!-- 1. Vehicle identity card -->
-  <div class="vehicle-hero">
-    <div class="vehicle-hero-make">BMW</div>
-    <div class="vehicle-hero-model">5 SERIES</div>
-    <div class="vehicle-hero-detail">2011 · VIN: WBAPH5C55BA123456</div>
-  </div>
-
-  <!-- 2. Popularity stats — KEY FEATURE -->
-  <div class="stats-grid">
-    <!-- Stat 1: Make popularity -->
-    <div class="stat-pill">
-      <div class="stat-pill-label">Make popularity</div>
-      <div class="stat-pill-value">#2</div>
-      <div class="stat-pill-sub">of 1763 makes in Järelturg</div>
-    </div>
-    <!-- Stat 2: Model popularity within ALL makes -->
-    <div class="stat-pill">
-      <div class="stat-pill-label">Model rank (market)</div>
-      <div class="stat-pill-value">#7</div>
-      <div class="stat-pill-sub">of all models traded</div>
-    </div>
-    <!-- Stat 3: Model popularity within THIS make -->
-    <div class="stat-pill">
-      <div class="stat-pill-label">Model rank (within BMW)</div>
-      <div class="stat-pill-value">#2</div>
-      <div class="stat-pill-sub">of 45 BMW models</div>
-    </div>
-    <!-- Stat 4: Total transactions for this model -->
-    <div class="stat-pill">
-      <div class="stat-pill-label">Transactions</div>
-      <div class="stat-pill-value">4,521</div>
-      <div class="stat-pill-sub">in selected period</div>
-    </div>
-  </div>
-
-  <!-- 3. Insight text — INTERPRETS the data -->
-  <div class="insight-card">
-    <p class="insight-text">
-      <strong>BMW 5 SERIES</strong> is the 2nd most popular BMW model and ranks #7 overall
-      in the Estonian used car market. With 4,521 transactions in the last 26 months,
-      it's a <strong>high-liquidity</strong> choice — easy to find a good deal and easy to resell.
-    </p>
-  </div>
-
-  <!-- 4. Configuration comparison (if config selected) -->
-  <div id="configComparison" style="display:none">
-    <h3 class="section-title">Configuration popularity</h3>
-    <p class="section-sub">How does your chosen configuration compare to others?</p>
-    <!-- Horizontal bar chart: each config as a bar, selected one highlighted -->
-    <canvas id="chartConfigPopularity"></canvas>
-  </div>
-
-  <!-- 5. Monthly trend chart -->
-  <div class="card">
-    <h3 class="card-title">Monthly transaction volume</h3>
-    <p class="card-sub">BMW 5 SERIES · Järelturg</p>
-    <canvas id="chartVehicleTrend"></canvas>
-  </div>
-
-  <!-- 6. Production year distribution -->
-  <div class="card">
-    <h3 class="card-title">Production year distribution</h3>
-    <p class="card-sub">Which model years are most traded?</p>
-    <canvas id="chartVehicleProdYear"></canvas>
-  </div>
-
-  <!-- 7. Cross-category comparison -->
-  <div class="card">
-    <h3 class="card-title">This model across market segments</h3>
-    <p class="card-sub">Järelturg vs New vs Import</p>
-    <!-- Show this model's presence in all 3 categories -->
-    <canvas id="chartVehicleCrossCategory"></canvas>
-  </div>
-</div>
-```
-
-### D. JavaScript implementation
-
-**New functions to add:**
-
-```javascript
-// 1. VIN lookup flow
-function lookupVIN() {
-  const vin = document.getElementById('vinInput').value.trim().toUpperCase();
-  const result = decodeVIN(vin);
-  if (!result.isValid) { showError(result.error); return; }
-  showVehicleReport({ make: result.make, model: null, variant: null, year: result.modelYear, vin });
-}
-
-// 2. Manual selection flow
-function lookupManual() {
-  const make = selectedMake, model = selectedModel, variant = selectedVariant;
-  showVehicleReport({ make, model, variant, year: null, vin: null });
-}
-
-// 3. Core report renderer
-function showVehicleReport({ make, model, variant, year, vin }) {
-  document.getElementById('vehicleReport').style.display = 'block';
-
-  // Calculate ALL popularity ranks
-  const months = filteredMonths(); // use ALL categories for cross-category
-
-  // a) Make rank (across all makes)
-  const makeRanks = rankMakes(months);
-  const makeRank = makeRanks.findIndex(m => m.make === make) + 1;
-
-  // b) Model rank (across ALL models of ALL makes)
-  const allModelRanks = rankAllModels(months);
-  const modelRankOverall = allModelRanks.findIndex(m => m.make === make && m.model === model) + 1;
-
-  // c) Model rank (within this make)
-  const makeModelRanks = rankModelsForMake(months, make);
-  const modelRankWithinMake = makeModelRanks.findIndex(m => m.model === model) + 1;
-
-  // d) If configuration selected: rank configs within this model
-  if (variant) {
-    const configRanks = rankConfigsForModel(months, make, model);
-    renderConfigComparison(configRanks, variant);
-  }
-
-  // e) Generate insight text
-  renderInsight(make, model, makeRank, modelRankOverall, totalTxs);
-
-  // f) Render charts
-  renderVehicleTrendChart(months, make, model, variant);
-  renderVehicleProdYearChart(months, make, model, variant);
-  renderCrossCategoryChart(make, model);
-}
-
-// 4. Ranking helpers
-function rankAllModels(months) {
-  // Aggregate all rows by make+model, return sorted by count desc
-  const map = {};
-  months.forEach(m => m.rows.forEach(r => {
-    const key = r.make + '|' + r.model;
-    map[key] = (map[key] || { make: r.make, model: r.model, count: 0 });
-    map[key].count += r.count;
-  }));
-  return Object.values(map).sort((a, b) => b.count - a.count);
-}
-
-function rankModelsForMake(months, make) {
-  // Same but filtered to one make
-  return rankAllModels(months).filter(m => m.make === make);
-}
-
-function rankConfigsForModel(months, make, model) {
-  // Aggregate by variant within make+model
-  const map = {};
-  months.forEach(m => m.rows.forEach(r => {
-    if (r.make !== make || r.model !== model) return;
-    const v = r.variant || r.fullModel || 'Unknown';
-    map[v] = (map[v] || { variant: v, count: 0 });
-    map[v].count += r.count;
-  }));
-  return Object.values(map).sort((a, b) => b.count - a.count);
-}
-
-// 5. Configuration comparison chart
-function renderConfigComparison(configRanks, selectedVariant) {
-  // Horizontal bar chart
-  // Selected variant highlighted in gold, others in gray
-  // Shows top 10 configurations + selected one if not in top 10
-  document.getElementById('configComparison').style.display = 'block';
-  // ... Chart.js horizontal bar implementation
-}
-
-// 6. Insight text generator
-function renderInsight(make, model, makeRank, modelRank, txCount) {
-  const liquidity = txCount > 3000 ? 'high-liquidity' : txCount > 1000 ? 'moderate-liquidity' : 'niche';
-  const liquidityText = {
-    'high-liquidity': 'Easy to find a good deal and easy to resell.',
-    'moderate-liquidity': 'Reasonable availability on the market.',
-    'niche': 'Limited availability — finding the right one may take time.'
-  };
-  // Build natural language insight
-  // ...
-}
-
-// 7. Cross-category chart
-function renderCrossCategoryChart(make, model) {
-  // Show this model's transaction count in jarelturg, newCars, imports
-  // Stacked or grouped bar chart across months
-  // Helps user understand: is this model mostly traded used or bought new?
-}
-```
-
-### E. Make/Model selector in Vehicle Lookup
-
-Reuse the combobox pattern from Model Comparison, but with ONE set of dropdowns (Make → Model → Configuration). When the user selects:
-- **Make only:** Show make-level report
-- **Make + Model:** Show model-level report with model rank stats
-- **Make + Model + Config:** Show full report with configuration comparison
-
-### F. Style the report
-
-- **Vehicle hero section**: Large make name, model name below, subtle detail line
-- **Insight card**: Light yellow/gold background (`var(--gold2)`), left gold border, 14px font
-- **Card titles**: Use sentence case (not ALL CAPS MONOSPACE)
-  - "Monthly transaction volume" not "MONTHLY TRANSACTION VOLUME"
-  - "Production year distribution" not "PRODUCTION YEAR DISTRIBUTION"
-
-**Acceptance criteria:**
-- Vehicle Lookup page accessible from sidebar
-- VIN decode shows make-level AND attempts model matching from data
-- Manual selection works with Make → Model → Config cascade
-- Stat pills show: make rank, model rank (overall), model rank (within make), total transactions
-- Configuration comparison chart appears when a config is selected
-- Insight text generated dynamically based on data
-- Cross-category chart shows the model across järelturg, new, import
-- Sentence-case headers throughout
-- Reg number tab shows "Available Q2 2026" placeholder
-
----
-
-## Task 2.5: Integrate andmed.eesti.ee OpenData API
-
-**Status:** NOT STARTED
-**Priority:** P1 — replaces fragile URL-guessing in parse.py
+**Priority:** P0 — 0 months of import data is a critical gap
 **Files:** `parse.py`
 
-> ✅ **PM-verified API details (2026-03-25):** The API is live, public, no auth needed.
+### The problem
 
-**Confirmed working API endpoints:**
-- Search: `GET https://andmed.eesti.ee/api/datasets?search=infoleht`
-- Get dataset: `GET https://andmed.eesti.ee/api/datasets/1401f275-5b59-4bf9-b98a-61ea15bc95ea`
-- Download file: `GET https://andmed.eesti.ee/api/v2/datasets/9d2f4b4d-9eab-45f7-97b2-543600621aff/distribution/{distributionId}/file`
-- **No API key required** — rate limit 2000 req/window
+`db.imports.length === 0` — the Import sheet is either not being parsed or its data structure differs from Järelturg/Uued.
 
-**Dataset details:**
-- Dataset ID: `1401f275-5b59-4bf9-b98a-61ea15bc95ea`
-- Dataset Identifier: `9d2f4b4d-9eab-45f7-97b2-543600621aff`
-- Currently available: Nov 2025, Dec 2025, Jan 2026 (3 months)
+### How to debug
 
-**Implementation flow:**
-```
-Step 1: GET /api/datasets/1401f275-5b59-4bf9-b98a-61ea15bc95ea
-Step 2: Parse response.distributions[] — each has titleEt ("Infoleht YYYY-MM") and accessUrls[0]
-Step 3: Find latest month by sorting distributions on titleEt
-Step 4: Download via accessUrls[0] (returns XLSX binary)
-Step 5: Fallback to current URL-guessing if API fails
+```bash
+cd /Users/christopherjuul/Desktop/autoturg
+python3 -c "
+import openpyxl
+wb = openpyxl.load_workbook('path/to/INFOLEHT-022026.xlsx')
+print('Sheets:', wb.sheetnames)
+ws = wb['Import']  # or whatever it's called
+for row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+    print(row)
+"
 ```
 
-**Acceptance criteria:**
-- parse.py can discover and download infoleht files via the Open Data API
-- Fallback to URL-guessing still works if API is unavailable
-- Data output is identical to current (same schema, same parsing)
+### What to look for
+- The Import sheet might be called `Import`, `Imporditud`, or `Impordi` — check exact name
+- Row/column structure may differ from Järelturg (which has Make, Model, Variant, Count columns)
+- Import may have additional columns (origin country, vehicle type)
+- Skip rows where Make is in: `['KOKKU', 'TOTAL', 'ZUSAMMEN', 'SUM']` (per CLAUDE.md convention)
 
----
+### Fix
 
-## Task 2.6: UI polish pass
-
-**Status:** NOT STARTED
-**Priority:** P2 — do after core features work
-**Files:** `index.html` (CSS, HTML)
-
-**Quick wins to apply across the whole app:**
-
-### A. Sentence-case headers everywhere
-Replace all `ALL CAPS MONOSPACE` chart/section headers with sentence case:
-- `TOP 5 MAKES — MONTHLY TRANSACTION VOLUME` → `Top 5 makes — Monthly transaction volume`
-- `MARKET SHARE BY MAKE` → `Market share by make`
-- `MONTHLY TOTAL TRANSACTIONS` → `Monthly total transactions`
-- `TOP MAKES RANKED` → `Top makes ranked`
-- `SELECT UP TO 5 MAKE · MODEL · CONFIGURATION COMBINATIONS` → `Select up to 5 models to compare`
-
-Change the CSS for card titles:
-```css
-.card-title {
-  font-family: var(--font);        /* was var(--mono) */
-  font-size: 15px;                 /* was 11px */
-  font-weight: 600;                /* was 700 */
-  letter-spacing: 0;               /* was 0.08em */
-  text-transform: none;            /* was uppercase */
-}
-.card-sub {
-  font-family: var(--font);        /* was var(--mono) */
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: none;            /* was uppercase */
-}
-```
-
-### B. Collapse Model Comparison to 2 default slots
-In `buildModelSlots()`, only render 2 slots by default. Add an "Add model +" button that adds up to 3 more.
-
-### C. Hide Sync & Upload
-Move it out of the main nav. Add a small "⚙️" icon button in the sidebar bottom (next to sync status) that opens the sync page. Don't list it as a primary view.
-
-### D. Add insight text to Overview page
-Below the stats-grid, add a brief auto-generated insight:
-```
-"Volkswagen leads the Estonian used car market with 10.1% share,
-followed by BMW (9.4%) and Toyota (7.2%)."
-```
-
-**Acceptance criteria:**
-- All headers in sentence case
-- Model Comparison starts with 2 slots + "Add model" button
-- Sync page hidden from main nav
-- At least one insight text on Overview page
-
----
-
-## Task 2.7: Update documentation
-
-**Status:** NOT STARTED
-**Priority:** P1 — do after Tasks 2.1-2.6 are complete
-**Files:** `docs/rpd.md`, `docs/data-schema.md`, `docs/buildplan.md`, `docs/architecture.md`
-
-**What to do:**
-1. In `docs/rpd.md`: Update FR statuses for completed features
-2. In `docs/data-schema.md`: Document any new data structures (ranking functions, etc.)
-3. In `docs/buildplan.md`: Check off Sprint 2 deliverables
-4. In `docs/architecture.md`: Document the andmed.eesti.ee API integration
-5. In `docs/ui-review.md`: Mark resolved issues
-
----
-
-## How to Work
-
-1. Pick the next NOT STARTED task **in the order listed above**
-2. Read `index.html` fully to understand current code patterns
-3. Implement the changes
-4. Update this file: change status to DONE with notes on what was implemented
-5. Commit with a descriptive message
-6. Move to the next task
-
-**Key code locations in `index.html`:**
-- CSS: lines 8–636
-- Sidebar HTML: lines 640–688
-- Main content HTML: lines 690–871
-- JS globals: lines 877–882 (`db`, `activeCategory`, `charts`, `slots`)
-- `switchCategory()`: line 1009
-- `showPage()`: line 1038
-- `renderOverview()`: line 1094
-- `buildModelSlots()`: line 1371
-- Chart helper `chartOpts()`: check for responsive Chart.js options
-- `activeMonths()`: line 904 (returns months for current category)
-- `filteredMonths()`: line 921 (applies timeline filter)
-- `allMakes()`: line 1257
-- `modelsForMake()`: line 1263
-- `variantsForMakeModel()`: line 1269
-
-**Data structure:**
-```javascript
-db = { jarelturg: [], newCars: [], imports: [] }
-// Each category array contains month objects:
-{ year: 2024, month: 1, label: "Jan 2024", rows: [
-  { make: "BMW", model: "5 SERIES", variant: "520D", fullModel: "5 SERIES 520D", prodYear: 2018, count: 12 }
+Update `parse.py` to correctly identify and parse the Import sheet. Store in the same schema as järelturg:
+```python
+{ "year": 2024, "month": 1, "label": "Jan 2024", "rows": [
+  { "make": "TOYOTA", "model": "COROLLA", "variant": "", "fullModel": "COROLLA", "prodYear": 2019, "count": 12 }
 ]}
 ```
 
-## Data Source Reference
+### Acceptance criteria
+- `data.json` includes at least 10 months of import data (all months where the XLSX has Import sheet data)
+- Import data is visible in the app when "Import" category is selected
+- `db.imports.length >= 10` in browser console
 
-**andmed.eesti.ee API (✅ VERIFIED WORKING):**
-- Swagger docs: https://andmed.eesti.ee/api/dataset-docs/
-- Dataset page: https://andmed.eesti.ee/datasets/infoleht-(esmaste-ja-uute-soidukite-statistika)
-- **Search:** `GET https://andmed.eesti.ee/api/datasets?search=infoleht` (no auth)
-- **Get dataset:** `GET https://andmed.eesti.ee/api/datasets/1401f275-5b59-4bf9-b98a-61ea15bc95ea`
-- **Download:** `GET https://andmed.eesti.ee/api/v2/datasets/9d2f4b4d-9eab-45f7-97b2-543600621aff/distribution/{distributionId}/file`
-- Rate limit: 2000 req/window
-- Current files: INFOLEHT-112025.xlsx, INFOLEHT-122025.xlsx, INFOLEHT-012026.xlsx
+---
 
-**Statistikaamet API (andmed.stat.ee):**
-- Table TS322: First registrations by month
-- API docs: https://andmed.stat.ee/abi/api-juhend.pdf
+## Task 2.3: Data normalization — Model grouping
 
-**mntstat.ee:**
-- Public vehicle database: https://www.mntstat.ee/
-- 829K+ vehicle records, web interface only — no REST API
+**Status:** NOT STARTED
+**Priority:** P1 — critical for Vehicle Lookup usability
+**Files:** `parse.py`, `data.json`
 
-**Transpordiamet infoleht files (fallback):**
-- Download pattern: `https://www.transpordiamet.ee/sites/default/files/documents/{YYYY-MM}/INFOLEHT-{MMYYYY}.xlsx`
+### The problem
+
+Source data uses **engine codes** as model names. BMW alone has 242 "models":
+- `116D`, `118D`, `120D` → should all be grouped as `1 SERIES`
+- `318I`, `320D`, `330D` → `3 SERIES`
+- `520D`, `530D`, `550E` → `5 SERIES`
+
+A user searching for "BMW 3 Series" finds nothing. A user searching for `320D` finds only `320D` not related models.
+
+### Implementation
+
+Add a `normalize_model(make, raw_model)` function to `parse.py` that maps engine codes to series names. Store **both** the raw and normalized value:
+
+```python
+def normalize_model(make: str, raw_model: str) -> str:
+    """Map raw engine-code model names to human-readable series/model names."""
+    make = make.upper()
+    raw = raw_model.upper().strip()
+
+    if make == 'BMW':
+        return BMW_SERIES_MAP.get(raw, raw)
+    elif make == 'MERCEDES-BENZ':
+        return MERCEDES_MAP.get(raw, raw)
+    # etc.
+    return raw  # fallback: keep original
+
+BMW_SERIES_MAP = {
+    # 1 Series (F20/F21/E87)
+    '114D': '1 SERIES', '114I': '1 SERIES',
+    '116D': '1 SERIES', '116ED': '1 SERIES', '116I': '1 SERIES',
+    '118D': '1 SERIES', '118I': '1 SERIES',
+    '120D': '1 SERIES', '120I': '1 SERIES',
+    '123D': '1 SERIES', '125D': '1 SERIES', '125I': '1 SERIES',
+    '128I': '1 SERIES', '130I': '1 SERIES', '135I': '1 SERIES',
+    # 2 Series
+    '214D': '2 SERIES', '216D': '2 SERIES', '218D': '2 SERIES',
+    '218I': '2 SERIES', '220D': '2 SERIES', '220I': '2 SERIES',
+    '225D': '2 SERIES', '225XE': '2 SERIES', '228I': '2 SERIES',
+    '230I': '2 SERIES', '235I': '2 SERIES', '240I': '2 SERIES',
+    # 3 Series
+    '316D': '3 SERIES', '316I': '3 SERIES',
+    '318D': '3 SERIES', '318I': '3 SERIES',
+    '320D': '3 SERIES', '320I': '3 SERIES', '320XD': '3 SERIES',
+    '323I': '3 SERIES', '325D': '3 SERIES', '325I': '3 SERIES',
+    '328D': '3 SERIES', '328I': '3 SERIES',
+    '330D': '3 SERIES', '330E': '3 SERIES', '330I': '3 SERIES',
+    '335D': '3 SERIES', '335I': '3 SERIES', '340I': '3 SERIES',
+    # 4 Series
+    '418D': '4 SERIES', '418I': '4 SERIES',
+    '420D': '4 SERIES', '420I': '4 SERIES',
+    '425D': '4 SERIES', '428I': '4 SERIES',
+    '430D': '4 SERIES', '430I': '4 SERIES',
+    '435D': '4 SERIES', '435I': '4 SERIES', '440I': '4 SERIES',
+    # 5 Series
+    '518D': '5 SERIES', '518I': '5 SERIES',
+    '520D': '5 SERIES', '520I': '5 SERIES',
+    '523I': '5 SERIES', '525D': '5 SERIES', '525I': '5 SERIES',
+    '528I': '5 SERIES', '530D': '5 SERIES', '530E': '5 SERIES',
+    '530I': '5 SERIES', '535D': '5 SERIES', '535I': '5 SERIES',
+    '540D': '5 SERIES', '540I': '5 SERIES',
+    '545I': '5 SERIES', '550E': '5 SERIES', '550I': '5 SERIES',
+    # 6 Series
+    '620D': '6 SERIES', '625D': '6 SERIES', '630D': '6 SERIES',
+    '630I': '6 SERIES', '633CSI': '6 SERIES', '635CSI': '6 SERIES',
+    '640D': '6 SERIES', '640I': '6 SERIES', '645CI': '6 SERIES',
+    '650I': '6 SERIES',
+    # 7 Series
+    '725TDS': '7 SERIES', '728I': '7 SERIES', '730D': '7 SERIES',
+    '730I': '7 SERIES', '735I': '7 SERIES', '740D': '7 SERIES',
+    '740E': '7 SERIES', '740I': '7 SERIES', '745E': '7 SERIES',
+    '745I': '7 SERIES', '750E': '7 SERIES', '750I': '7 SERIES',
+    '760I': '7 SERIES',
+    # 8 Series
+    '840D': '8 SERIES', '840I': '8 SERIES', '850CSI': '8 SERIES',
+    '850I': '8 SERIES', 'M850I': '8 SERIES',
+    # X Series (SUVs — keep as-is, they're already good)
+    # M Series
+    'M2': 'M2', 'M3': 'M3', 'M4': 'M4', 'M5': 'M5',
+    'M6': 'M6', 'M8': 'M8',
+    # Z Series
+    'Z3': 'Z3', 'Z4': 'Z4', 'Z8': 'Z8',
+    # i Series (electric)
+    'I3': 'I3', 'I4': 'I4', 'I5': 'I5', 'I7': 'I7', 'IX': 'IX',
+}
+
+MERCEDES_MAP = {
+    # C-Class
+    'C 180': 'C-CLASS', 'C 200': 'C-CLASS', 'C 220': 'C-CLASS',
+    'C 250': 'C-CLASS', 'C 300': 'C-CLASS', 'C 320': 'C-CLASS',
+    'C 350': 'C-CLASS', 'C 400': 'C-CLASS', 'C 63': 'C-CLASS',
+    # E-Class
+    'E 200': 'E-CLASS', 'E 220': 'E-CLASS', 'E 250': 'E-CLASS',
+    'E 280': 'E-CLASS', 'E 300': 'E-CLASS', 'E 320': 'E-CLASS',
+    'E 350': 'E-CLASS', 'E 400': 'E-CLASS', 'E 450': 'E-CLASS',
+    'E 500': 'E-CLASS', 'E 63': 'E-CLASS',
+    # S-Class
+    'S 300': 'S-CLASS', 'S 320': 'S-CLASS', 'S 350': 'S-CLASS',
+    'S 400': 'S-CLASS', 'S 450': 'S-CLASS', 'S 500': 'S-CLASS',
+    'S 580': 'S-CLASS', 'S 63': 'S-CLASS', 'S 65': 'S-CLASS',
+    # A-Class
+    'A 160': 'A-CLASS', 'A 170': 'A-CLASS', 'A 180': 'A-CLASS',
+    'A 200': 'A-CLASS', 'A 220': 'A-CLASS', 'A 250': 'A-CLASS',
+    'A 35': 'A-CLASS', 'A 45': 'A-CLASS',
+    # B-Class
+    'B 150': 'B-CLASS', 'B 160': 'B-CLASS', 'B 180': 'B-CLASS',
+    'B 200': 'B-CLASS', 'B 220': 'B-CLASS', 'B 250': 'B-CLASS',
+    # GLC, GLE, GLA, GLB — keep as-is, already readable
+}
+```
+
+### Data schema change
+
+Each row gets a new field `seriesName` (falls back to `model` if no mapping):
+
+```json
+{
+  "make": "BMW",
+  "model": "320D",
+  "seriesName": "3 SERIES",
+  "variant": "",
+  "fullModel": "320D",
+  "prodYear": 2018,
+  "count": 12
+}
+```
+
+### Frontend update needed
+
+In `data-utils.ts`, update `uniqueModels()`, `modelOptionsWithCounts()`, and `rankModelsForMake()` to **group by `seriesName`** and sum counts, but keep `model` available for drill-down.
+
+```typescript
+// Group rows by seriesName (fall back to model)
+export function modelOptionsWithCounts(months: MonthEntry[], make: string): [string, number][] {
+  const map = new Map<string, number>();
+  for (const m of months) {
+    for (const r of m.rows) {
+      if (r.make !== make) continue;
+      const key = r.seriesName || r.model;  // USE seriesName
+      map.set(key, (map.get(key) ?? 0) + r.count);
+    }
+  }
+  return [...map.entries()].sort((a, b) => b[1] - a[1]);
+}
+```
+
+### Acceptance criteria
+- BMW dropdown shows "1 SERIES", "3 SERIES", "5 SERIES" etc. instead of "116D", "320D"
+- Selecting "3 SERIES" shows ALL 3-series transactions (320D + 318I + 330D etc. combined)
+- `seriesName` field present in all rows in `data.json`
+- Makes that don't need normalization (VW, Toyota) unaffected
+- After selecting a series, the variant dropdown shows the actual engine codes (320D, 318I, etc.)
+
+---
+
+## Task 2.4: Timeline preset buttons
+
+**Status:** NOT STARTED
+**Priority:** P1 — quick usability win
+**Files:** `src/context/DataContext.tsx`, `src/components/layout/Topbar.tsx` (or wherever timeline is)
+
+### What to build
+
+Add 4 preset buttons next to the existing timeline controls:
+- **Last month** — previous calendar month
+- **This year** — Jan of current year → latest available month
+- **Last year** — Jan–Dec of previous year
+- **All** (already exists) — full data range
+
+### Implementation
+
+First, find where the timeline dropdowns live. Search for `timelineFrom` or `setTimeline` in the codebase.
+
+Add a `setPreset(preset: 'lastMonth' | 'thisYear' | 'lastYear' | 'all')` function:
+
+```typescript
+function setPreset(preset: string) {
+  const now = new Date();
+  let from: TimelinePoint, to: TimelinePoint;
+
+  if (preset === 'lastMonth') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    from = to = { year: d.getFullYear(), month: d.getMonth() + 1 };
+  } else if (preset === 'thisYear') {
+    from = { year: now.getFullYear(), month: 1 };
+    to = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  } else if (preset === 'lastYear') {
+    from = { year: now.getFullYear() - 1, month: 1 };
+    to = { year: now.getFullYear() - 1, month: 12 };
+  } else {
+    setTimeline(null, null); // "All"
+    return;
+  }
+
+  // Clamp to available data range
+  setTimeline(
+    clampToAvailableMonths(from, allMonths),
+    clampToAvailableMonths(to, allMonths)
+  );
+}
+```
+
+### UI pattern
+
+Use small pill buttons styled like the existing category tabs. Active preset highlighted.
+
+```tsx
+<div className="flex gap-1 items-center">
+  {['Last month', 'This year', 'Last year', 'All'].map(label => (
+    <button
+      key={label}
+      onClick={() => setPreset(label.toLowerCase().replace(' ', ''))}
+      className={cn(
+        "px-3 py-1 text-xs rounded-md font-medium transition-colors",
+        activePreset === label
+          ? "bg-primary text-primary-foreground"
+          : "bg-muted text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {label}
+    </button>
+  ))}
+</div>
+```
+
+### Acceptance criteria
+- 4 preset buttons visible alongside timeline
+- Each correctly filters to the right date range
+- "All" button resets to full data
+- Active preset is visually highlighted
+- Works correctly when preset range exceeds available data (clamps gracefully)
+
+---
+
+## Task 2.5: UI polish pass
+
+**Status:** NOT STARTED
+**Priority:** P2 — do after 2.1–2.4 are done
+**Files:** Various `src/` files
+
+### Review checklist
+
+Run the app and check each of these:
+
+**A. Vehicle Lookup page**
+- [ ] Reg Number tab is default (should already be from recent commit)
+- [ ] `VehicleSpecsCard` shows real fields: make, model, year, fuel type, odometer, colour, first registration date
+- [ ] Popularity stats show: make rank (#N of all makes), model rank overall, model rank within make, total transactions
+- [ ] Configuration comparison chart appears when a variant is selected — horizontal bar, selected variant highlighted
+- [ ] Insight text is generated and reads naturally in English
+- [ ] Production year chart visible and correct
+- [ ] Cross-category chart shows järelturg vs new vs import for the selected model
+
+**B. Overview page**
+- [ ] Category tabs (Järelturg / Uued sõidukid / Import / Kogu turg) are in-page, not sidebar
+- [ ] Switching category updates all charts and stats
+- [ ] At least one insight text/sentence below the stat pills
+- [ ] All chart titles in sentence case (not ALL CAPS MONOSPACE)
+
+**C. Comparison page**
+- [ ] Starts with 2 slots visible, "Add model +" adds up to 3 more
+- [ ] Category switcher present
+
+**D. General**
+- [ ] No horizontal scroll on any page at 1440px width
+- [ ] Mobile nav works (burger menu)
+- [ ] Loading states show skeletons, not blank/broken UI
+- [ ] Sync & Upload not in primary nav — moved to small gear icon at sidebar bottom
+
+### For each issue found:
+Fix it in the same PR. Keep fixes focused and small.
+
+### Acceptance criteria
+- All checklist items pass
+- No console errors on any page
+- No visible layout breaks at 1440px and 375px (mobile)
+
+---
+
+## How Builder Should Work
+
+1. Pick the next NOT STARTED task in order above
+2. Read the relevant files fully before starting
+3. Implement → verify in browser → fix any issues
+4. Update task status to DONE with brief notes
+5. Commit: `git commit -m "Sprint 2.X: [what was done]"`
+6. Push and create PR against `main`
+7. Move to next task
+
+**Key file locations:**
+```
+src/
+  pages/          — full page components
+  components/
+    layout/       — Sidebar, Topbar, MobileNav
+    shared/       — StatPill, InsightCard, ChartCard, VehicleSpecsCard
+    charts/       — all chart components
+    ui/           — shadcn primitives (Button, Card, Badge, etc.)
+  lib/
+    data-utils.ts — all data aggregation functions
+    price-utils.ts — pricing, depreciation
+    vehicle-proxy.ts — ATV API proxy client
+    vin-decoder.ts — VIN decode logic
+  context/
+    DataContext.tsx — global state (db, category, timeline, prices)
+  types/
+    index.ts      — TypeScript types
+parse.py          — data pipeline (monthly XLSX → data.json)
+worker/           — Cloudflare Worker proxy
+```
+
+**Dev server:**
+```bash
+cd /Users/christopherjuul/Desktop/autoturg
+npm run dev
+# Opens at http://localhost:5173/autoturg/
+```
+
+---
+
+## Definition of Done (Sprint 2)
+
+- [ ] Task 2.1: PR created, atv-integration-react ready for merge
+- [ ] Task 2.2: `db.imports.length >= 10` in browser console
+- [ ] Task 2.3: BMW shows series names, not engine codes
+- [ ] Task 2.4: Timeline presets working
+- [ ] Task 2.5: All polish checklist items pass
+- [ ] All committed, pushed, PRs created against main
+- [ ] Docs updated (rpd.md, architecture.md, buildplan.md)

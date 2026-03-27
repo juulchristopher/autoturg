@@ -228,17 +228,22 @@ gantt
 ## Dependency Map
 
 ```
-Phase 0 (DONE)
-    └── Phase 1: Expand Data Sources
-            └── Phase 2: Vehicle Lookup
-                    ├── Phase 3: Pricing Intelligence
-                    │       └── Phase 4: Depreciation Analysis
-                    │               └── Phase 5: Polish & Scale
-                    └── [ATV API credentials — critical path]
+Sprint 0–1 (DONE)
+    └── Sprint 2: API & VIN Foundation
+            └── Sprint 3: Teabevarav API & Enrichment
+                    └── Sprint 4: auto24.ee Pricing ──────┐
+                        Sprint 5: International Pricing ───┤ (can run in parallel)
+                                                           └── Sprint 6: Depreciation
+                                                                   └── Sprint 7+: Polish
 ```
 
 ## Critical Path Items
 
-1. **ATV API credentials** — Contact Transpordiamet as soon as Phase 1 starts. This gates Phase 2.
-2. **mobile.de API account** — Apply during Phase 2. This gates Phase 3.
-3. **auto24.ee data access** — Explore partnership during Phase 2. Scraping is fallback. This partially gates Phase 3.
+| Blocker | Gates | Owner Action | Deadline |
+|---------|-------|-------------|----------|
+| Teabevarav API access | Sprint 3 | Check https://abi.ria.ee/teabevarav/ for registration | This week |
+| auto24.ee data access | Sprint 4 | Email info@auto24.ee about partnership | This week |
+| mobile.de API account | Sprint 5 | Apply at services.mobile.de | Now (weeks lead time) |
+| AutoScout24 API access | Sprint 5 | Apply at developer portal | Now (weeks lead time) |
+
+**Note:** Sprints 2–3 have NO external blockers. Sprint 5 can run in parallel with Sprint 4 if API credentials arrive. Sprint 6 needs at least one pricing source (Sprint 4 or 5).

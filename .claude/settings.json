@@ -1,6 +1,19 @@
 {
   "model": "claude-sonnet-4-6",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/user/autoturg/.claude/hooks/check-usage.sh",
+            "timeout": 5,
+            "statusMessage": "Checking usage limit..."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

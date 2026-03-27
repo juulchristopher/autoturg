@@ -144,6 +144,24 @@ Four persistent agents, each with their own sub-instructions in `.claude/agents/
 - **Always pass `model: "sonnet"`** in Agent tool calls unless Opus is explicitly warranted
 - **Keep agent prompts focused** — don't dump full files into context; reference specific paths
 
+### Usage limit monitoring (90% auto-stop)
+
+When plan usage reaches **90%**, Claude must:
+1. Commit and push all in-progress work
+2. Save the session checkpoint: `bash /home/user/autoturg/.claude/hooks/on-stop.sh`
+3. Activate the usage sentinel: `touch /tmp/autoturg-usage-stop`
+4. Stop the session — the `PreToolUse` hook will block all further tool calls
+
+**Trigger conditions** (any one is sufficient):
+- The user says usage is at or above 90%
+- The Claude Code status bar shows ≥ 90%
+- You receive a rate-limit or quota error from the API
+
+**Resume**: When usage resets (typically 1 hour), remove the sentinel:
+`rm /tmp/autoturg-usage-stop`
+
+The next session will auto-read `.session-checkpoint.md` via `on-session-start.sh` and continue from the sprint backlog.
+
 ### Context window + session continuity
 
 - When a session ends (context full or manual stop), a checkpoint is auto-saved to `.session-checkpoint.md`

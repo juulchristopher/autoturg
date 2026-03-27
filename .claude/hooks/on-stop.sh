@@ -44,4 +44,15 @@ if ! git diff --quiet "$CHECKPOINT" 2>/dev/null || ! git ls-files --error-unmatc
   git commit -m "Save session checkpoint" --no-verify 2>/dev/null || true
 fi
 
-echo '{"systemMessage": "Session checkpoint saved to .session-checkpoint.md"}'
+# If the usage sentinel is set, record the expected reset time (now + 1 hour)
+# and push all work so the next session can resume cleanly.
+SENTINEL="/tmp/autoturg-usage-stop"
+if [ -f "$SENTINEL" ]; then
+  RESET_AT=$(date -u -d '+1 hour' '+%Y-%m-%d %H:%M UTC' 2>/dev/null || date -u -v+1H '+%Y-%m-%d %H:%M UTC' 2>/dev/null || echo "soon")
+  echo "$RESET_AT" > /tmp/autoturg-usage-reset-time
+  # Try to push checkpoint to remote
+  git push -u origin "$BRANCH" 2>/dev/null || true
+  echo "{\"systemMessage\": \"Usage limit reached. Checkpoint saved. Session will resume at $RESET_AT.\"}"
+else
+  echo '{"systemMessage": "Session checkpoint saved to .session-checkpoint.md"}'
+fi

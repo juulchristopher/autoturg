@@ -639,6 +639,14 @@ export default function VehicleLookup() {
               </Card>
             )}
 
+            {/* Hint: select model to unlock pricing */}
+            {!reportData.model && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                Select a model above to unlock pricing intelligence and depreciation analysis.
+              </div>
+            )}
+
             {/* Model comparison chart (horizontal bar) */}
             {reportData.modelsRanked.length > 0 && (
               <ChartCard

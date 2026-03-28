@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, GitCompare, Search, Database, Menu, Car, LogIn } from 'lucide-react';
+import { BarChart3, GitCompare, Search, Database, Menu, Car, LogIn, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { icon: GitCompare, label: 'Comparison', path: '/comparison' },
   { icon: Search, label: 'Vehicle Lookup', path: '/vehicle' },
   { icon: Database, label: 'Data Status', path: '/status' },
+  { icon: CreditCard, label: 'Pricing', path: '/pricing' },
 ];
 
 export default function MobileNav() {

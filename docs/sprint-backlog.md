@@ -2,13 +2,72 @@
 
 ---
 
-## Sprint 4: Auth Foundation
+## Sprint 5: Payments Foundation
+> **Goal:** Users can subscribe and pay per report. Lemon Squeezy integration. No gating yet — payments exist, entitlements stored.
+> **Sprint dates:** 2026-03-28 — 2026-04-07
+> **References:** ADR-008, ADR-009
+
+### Task 5.1: Lemon Squeezy client + types
+**Status:** TODO
+**Priority:** P0
+**Files:** `src/lib/lemonsqueezy.ts`, `src/types/index.ts`
+
+**Scope:**
+- Lemon Squeezy JS SDK or direct API calls for checkout
+- `createSubscriptionCheckout(email)` — opens LS checkout overlay for subscription product
+- `createReportCheckout(email, make, model)` — opens LS checkout overlay for one-off report
+- Product/variant IDs via `VITE_LS_SUBSCRIPTION_VARIANT_ID` and `VITE_LS_REPORT_VARIANT_ID` env vars
+- Store ID via `VITE_LS_STORE_ID`
+
+---
+
+### Task 5.2: PricingCard component + Pricing page
+**Status:** TODO
+**Priority:** P0
+**Files:** `src/components/shared/PricingCard.tsx`, `src/pages/Pricing.tsx`
+
+**Scope:**
+- `PricingCard` — free tier, subscriber tier, pay-per-report cards with feature lists
+- `Pricing.tsx` page at `/pricing` route
+- Subscriber card calls `createSubscriptionCheckout`
+- Shows current tier (from `useAuth()`) with appropriate CTA
+- Mobile-responsive 3-column layout
+
+---
+
+### Task 5.3: Supabase Edge Function: payment-webhook
+**Status:** TODO
+**Priority:** P0
+**Files:** `supabase/functions/payment-webhook/index.ts`
+
+**Scope:**
+- Receives Lemon Squeezy webhook (order_created, subscription_created, subscription_updated)
+- Verifies HMAC signature with `LEMON_SQUEEZY_WEBHOOK_SECRET`
+- `subscription_created` → upsert `subscriptions` row with status=active, expiry
+- `subscription_cancelled` / `subscription_expired` → update status
+- `order_created` for report → insert `report_purchases` row
+- Return 200 on success, 400 on bad signature
+
+---
+
+### Task 5.4: Pricing page link in nav + docs update
+**Status:** TODO
+**Priority:** P1
+**Files:** `src/components/layout/Sidebar.tsx`, `src/components/layout/MobileNav.tsx`, `docs/sprint-backlog.md`
+
+**Scope:**
+- Add "Pricing" nav item (CreditCard icon) to sidebar + mobile nav
+- Update sprint backlog, rpd.md FR statuses
+
+---
+
+## Sprint 4: Auth Foundation (DONE)
 > **Goal:** Users can create accounts and sign in. No content gating yet — all existing features remain free.
-> **Sprint dates:** 2026-03-28 — 2026-04-04
+> **Completed:** 2026-03-28
 > **References:** ADR-006, ADR-007
 
 ### Task 4.1: Supabase project setup
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Files:** `src/lib/supabase.ts`, `supabase/migrations/001_create_tables.sql`, `.env.example`
 
@@ -22,7 +81,7 @@
 ---
 
 ### Task 4.2: AuthContext + useAuth hook
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Files:** `src/context/AuthContext.tsx`, `src/App.tsx`
 
@@ -36,7 +95,7 @@
 ---
 
 ### Task 4.3: Login/signup UI
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Files:** `src/components/shared/LoginDialog.tsx`, `src/components/shared/UserMenu.tsx`
 
@@ -49,7 +108,7 @@
 ---
 
 ### Task 4.4: Privacy policy page
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Files:** `src/pages/Privacy.tsx`, `src/App.tsx`
 

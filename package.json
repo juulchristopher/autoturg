@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@radix-ui/react-dialog": "^1.1.3",
     "@radix-ui/react-popover": "^1.1.3",
     "@radix-ui/react-select": "^2.1.3",

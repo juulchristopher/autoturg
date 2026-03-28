@@ -9,6 +9,7 @@ import Comparison from '@/pages/Comparison';
 import VehicleLookup from '@/pages/VehicleLookup';
 import DataStatus from '@/pages/DataStatus';
 import Privacy from '@/pages/Privacy';
+import Pricing from '@/pages/Pricing';
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
                   <Route path="/comparison" element={<Comparison />} />
                   <Route path="/vehicle" element={<VehicleLookup />} />
                   <Route path="/status" element={<DataStatus />} />
+                  <Route path="/pricing" element={<Pricing />} />
                   <Route path="/privacy" element={<Privacy />} />
                 </Routes>
               </div>

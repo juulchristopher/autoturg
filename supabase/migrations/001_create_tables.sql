@@ -4,10 +4,9 @@
 create table if not exists subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  lemon_squeezy_id text unique not null,
-  status text not null default 'active',  -- active | paused | cancelled | expired
-  plan text not null,                      -- monthly | annual
-  current_period_end timestamptz,
+  stripe_subscription_id text unique not null,
+  status text not null default 'active',  -- active | past_due | cancelled | unpaid | paused
+  expires_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -15,7 +14,7 @@ create table if not exists subscriptions (
 create table if not exists report_purchases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  lemon_squeezy_order_id text unique not null,
+  order_id text unique not null,  -- Stripe payment_intent id
   make text not null,
   model text not null,
   purchased_at timestamptz default now()
@@ -31,7 +30,7 @@ create policy "Users can read own subscriptions"
 create policy "Users can read own report purchases"
   on report_purchases for select using (auth.uid() = user_id);
 
--- Service role can write (used by payment webhook edge function)
+-- Service role can write (used by payment-webhook edge function)
 create policy "Service role can manage subscriptions"
   on subscriptions for all using (auth.role() = 'service_role');
 

@@ -2,27 +2,32 @@ import { useState } from 'react';
 import { Shield, RefreshCw } from 'lucide-react';
 import PricingCard from '@/components/shared/PricingCard';
 import { useAuth } from '@/context/AuthContext';
-import { openSubscriptionCheckout, openReportCheckout, isLSConfigured } from '@/lib/lemonsqueezy';
+import { openSubscriptionCheckout, openReportCheckout } from '@/lib/stripe';
 
 export default function Pricing() {
   const { user, tier } = useAuth();
   const [loadingPro, setLoadingPro] = useState(false);
-  const lsReady = isLSConfigured();
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubscribe() {
-    if (!lsReady) return;
+  async function handleSubscribe() {
+    setError(null);
     setLoadingPro(true);
     try {
-      openSubscriptionCheckout(user?.email);
+      await openSubscriptionCheckout(user?.email);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
-      // Reset after a beat — LS overlay is async, loading state is just UX feedback
-      setTimeout(() => setLoadingPro(false), 1500);
+      setLoadingPro(false);
     }
   }
 
-  function handleReport() {
-    if (!lsReady) return;
-    openReportCheckout(user?.email);
+  async function handleReport() {
+    setError(null);
+    try {
+      await openReportCheckout(user?.email);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    }
   }
 
   return (
@@ -58,26 +63,24 @@ export default function Pricing() {
         />
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive text-center">
+          {error}
+        </div>
+      )}
+
       {/* Trust signals */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Shield className="h-3.5 w-3.5 text-primary" />
-          <span>Payments by Lemon Squeezy — EU VAT handled automatically</span>
+          <span>Payments by Stripe — EU VAT handled automatically via Stripe Tax</span>
         </div>
         <div className="flex items-center gap-1.5">
           <RefreshCw className="h-3.5 w-3.5 text-primary" />
           <span>Cancel subscription any time — no lock-in</span>
         </div>
       </div>
-
-      {/* LS not configured notice (dev only) */}
-      {!lsReady && (
-        <div className="mt-8 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-400 text-center">
-          Payments not yet configured. Set <code>VITE_LS_STORE_SUBDOMAIN</code>,{' '}
-          <code>VITE_LS_SUBSCRIPTION_VARIANT_ID</code>, and <code>VITE_LS_REPORT_VARIANT_ID</code> in{' '}
-          <code>.env</code> to enable checkout.
-        </div>
-      )}
     </main>
   );
 }

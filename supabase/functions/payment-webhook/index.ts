@@ -1,50 +1,38 @@
 /**
- * Lemon Squeezy → Supabase payment webhook
+ * payment-webhook — Supabase Edge Function
  *
- * Handles:
- *   subscription_created   → upsert active subscription
- *   subscription_updated   → update status / expiry
- *   subscription_cancelled → mark cancelled
- *   subscription_expired   → mark expired
- *   order_created          → record pay-per-report purchase
+ * Receives Stripe webhook events and updates the database.
+ *
+ * Handled events:
+ *   checkout.session.completed        → activate subscription OR record report purchase
+ *   customer.subscription.updated     → sync status / renewal date
+ *   customer.subscription.deleted     → mark cancelled
+ *
+ * Secrets required:
+ *   STRIPE_SECRET_KEY
+ *   STRIPE_WEBHOOK_SECRET             (from Stripe Dashboard → Webhooks → signing secret)
+ *   SUPABASE_URL                      (auto-injected)
+ *   SUPABASE_SERVICE_ROLE_KEY         (auto-injected)
  *
  * Deploy:
  *   supabase functions deploy payment-webhook --no-verify-jwt
  *
- * Secrets required (set via Supabase dashboard or `supabase secrets set`):
- *   LEMON_SQUEEZY_WEBHOOK_SECRET
- *   SUPABASE_URL            (auto-injected)
- *   SUPABASE_SERVICE_ROLE_KEY (auto-injected)
+ * Register in Stripe Dashboard:
+ *   URL: https://<project>.supabase.co/functions/v1/payment-webhook
+ *   Events: checkout.session.completed, customer.subscription.updated,
+ *           customer.subscription.deleted
  */
 
+// @deno-types="https://esm.sh/v135/stripe@14.21.0/types/index.d.ts"
+import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const WEBHOOK_SECRET = Deno.env.get('LEMON_SQUEEZY_WEBHOOK_SECRET') ?? '';
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
+  apiVersion: '2024-04-10',
+  httpClient: Stripe.createFetchHttpClient(),
+});
 
-async function verifySignature(req: Request, body: string): Promise<boolean> {
-  const signature = req.headers.get('x-signature');
-  if (!signature || !WEBHOOK_SECRET) return false;
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(WEBHOOK_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  );
-
-  const sigBytes = hexToBytes(signature);
-  const bodyBytes = new TextEncoder().encode(body);
-  return crypto.subtle.verify('HMAC', key, sigBytes, bodyBytes);
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-  }
-  return bytes;
-}
+const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
@@ -52,25 +40,19 @@ Deno.serve(async (req: Request) => {
   }
 
   const body = await req.text();
+  const signature = req.headers.get('stripe-signature') ?? '';
 
-  const valid = await verifySignature(req, body);
-  if (!valid) {
-    return new Response('Invalid signature', { status: 400 });
-  }
-
-  let payload: Record<string, unknown>;
+  let event: Stripe.Event;
   try {
-    payload = JSON.parse(body);
-  } catch {
-    return new Response('Bad JSON', { status: 400 });
-  }
-
-  const eventName = payload['meta'] && (payload['meta'] as Record<string, unknown>)['event_name'] as string;
-  const data = payload['data'] as Record<string, unknown> | undefined;
-  const attrs = data?.['attributes'] as Record<string, unknown> | undefined;
-
-  if (!eventName || !attrs) {
-    return new Response('Missing event_name or attributes', { status: 400 });
+    event = await stripe.webhooks.constructEventAsync(
+      body,
+      signature,
+      WEBHOOK_SECRET,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Webhook signature verification failed:', msg);
+    return new Response(`Webhook error: ${msg}`, { status: 400 });
   }
 
   const supabase = createClient(
@@ -78,112 +60,105 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // ----------------------------------------------------------------
-  // Subscription events
-  // ----------------------------------------------------------------
-  if (
-    eventName === 'subscription_created' ||
-    eventName === 'subscription_updated' ||
-    eventName === 'subscription_cancelled' ||
-    eventName === 'subscription_expired' ||
-    eventName === 'subscription_resumed' ||
-    eventName === 'subscription_paused'
-  ) {
-    const lsSubscriptionId = String(data!['id']);
-    const customerEmail = attrs['user_email'] as string | undefined;
-    const status = attrs['status'] as string; // active | paused | cancelled | expired | past_due | unpaid
-    const endsAt = attrs['ends_at'] as string | null;
-    const renewsAt = attrs['renews_at'] as string | null;
-
-    if (!customerEmail) {
-      return new Response('Missing user_email', { status: 400 });
-    }
-
-    // Resolve Supabase user ID from email
-    const { data: userList, error: userErr } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', customerEmail)
-      .limit(1);
-
-    // auth.users isn't directly queryable via the JS client — use admin API instead
-    const { data: { users }, error: adminErr } = await supabase.auth.admin.listUsers();
-    if (adminErr) {
-      console.error('Failed to list users:', adminErr);
-      return new Response('Internal error', { status: 500 });
-    }
-    const matchedUser = users.find((u) => u.email === customerEmail);
-    if (!matchedUser) {
-      // User hasn't signed up yet — store subscription linked by email for later claim
-      // For now, skip gracefully
-      console.warn('No Supabase user found for email:', customerEmail);
-      return new Response('OK (no user match)', { status: 200 });
-    }
-
-    const expiresAt = endsAt ?? renewsAt ?? null;
-
-    const { error } = await supabase.from('subscriptions').upsert(
-      {
-        user_id: matchedUser.id,
-        ls_subscription_id: lsSubscriptionId,
-        status,
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'ls_subscription_id' },
-    );
-
+  /** Resolve Supabase user ID from email. Returns null if not found. */
+  async function resolveUserId(email: string): Promise<string | null> {
+    const { data: { users }, error } = await supabase.auth.admin.listUsers();
     if (error) {
-      console.error('Upsert subscriptions error:', error);
-      return new Response('DB error', { status: 500 });
+      console.error('listUsers error:', error);
+      return null;
     }
-
-    return new Response('OK', { status: 200 });
+    return users.find((u) => u.email === email)?.id ?? null;
   }
 
-  // ----------------------------------------------------------------
-  // One-off report purchase
-  // ----------------------------------------------------------------
-  if (eventName === 'order_created') {
-    const orderId = String(data!['id']);
-    const customerEmail = attrs['user_email'] as string | undefined;
-    const customData = attrs['first_order_item'] as Record<string, unknown> | undefined;
-    // Custom fields are in meta.custom_data
-    const meta = payload['meta'] as Record<string, unknown> | undefined;
-    const custom = meta?.['custom_data'] as Record<string, string> | undefined;
-    const make = custom?.['make'];
-    const model = custom?.['model'];
+  try {
+    switch (event.type) {
+      // ----------------------------------------------------------------
+      // Checkout completed — subscription or one-off report
+      // ----------------------------------------------------------------
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const email =
+          session.customer_email ?? session.customer_details?.email ?? null;
 
-    if (!customerEmail) {
-      return new Response('Missing user_email', { status: 400 });
+        if (!email) {
+          console.warn('checkout.session.completed: no email in session');
+          break;
+        }
+
+        const userId = await resolveUserId(email);
+        if (!userId) {
+          console.warn('checkout.session.completed: no user for email', email);
+          break;
+        }
+
+        if (session.mode === 'subscription' && session.subscription) {
+          // Fetch the full subscription to get the period end date
+          const sub = await stripe.subscriptions.retrieve(
+            session.subscription as string,
+          );
+          await supabase.from('subscriptions').upsert(
+            {
+              user_id: userId,
+              stripe_subscription_id: sub.id,
+              status: sub.status, // 'active'
+              expires_at: new Date(sub.current_period_end * 1000).toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'stripe_subscription_id' },
+          );
+        } else if (session.mode === 'payment') {
+          const make = session.metadata?.make ?? '';
+          const model = session.metadata?.model ?? '';
+          await supabase.from('report_purchases').insert({
+            user_id: userId,
+            make,
+            model,
+            order_id: (session.payment_intent as string) ?? session.id,
+            purchased_at: new Date().toISOString(),
+          });
+        }
+        break;
+      }
+
+      // ----------------------------------------------------------------
+      // Subscription updated (renewal, pause, unpause, plan change)
+      // ----------------------------------------------------------------
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        await supabase
+          .from('subscriptions')
+          .update({
+            status: sub.status,
+            expires_at: new Date(sub.current_period_end * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_subscription_id', sub.id);
+        break;
+      }
+
+      // ----------------------------------------------------------------
+      // Subscription cancelled / ended
+      // ----------------------------------------------------------------
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription;
+        await supabase
+          .from('subscriptions')
+          .update({
+            status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_subscription_id', sub.id);
+        break;
+      }
+
+      default:
+        // Return 200 for unhandled events — prevents Stripe from retrying
+        break;
     }
-
-    const { data: { users }, error: adminErr } = await supabase.auth.admin.listUsers();
-    if (adminErr) {
-      return new Response('Internal error', { status: 500 });
-    }
-    const matchedUser = users.find((u) => u.email === customerEmail);
-    if (!matchedUser) {
-      console.warn('No Supabase user for report purchase:', customerEmail);
-      return new Response('OK (no user match)', { status: 200 });
-    }
-
-    const { error } = await supabase.from('report_purchases').insert({
-      user_id: matchedUser.id,
-      make: make ?? '',
-      model: model ?? '',
-      order_id: orderId,
-      purchased_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      console.error('Insert report_purchases error:', error);
-      return new Response('DB error', { status: 500 });
-    }
-
-    return new Response('OK', { status: 200 });
+  } catch (err) {
+    console.error('Handler error:', err);
+    return new Response('Internal error', { status: 500 });
   }
 
-  // Unhandled event — return 200 so LS doesn't retry
-  return new Response('Unhandled event', { status: 200 });
+  return new Response('OK', { status: 200 });
 });

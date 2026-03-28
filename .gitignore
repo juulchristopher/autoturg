@@ -6,3 +6,6 @@ dist/
 # Local env vars (never commit)
 .env
 .env.local
+
+# Supabase CLI cache
+supabase/.temp/

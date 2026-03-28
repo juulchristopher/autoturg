@@ -24,6 +24,7 @@ import { decodeVIN } from '@/lib/vin-decoder';
 import { getProxyUrl, lookupByReg } from '@/lib/vehicle-proxy';
 import type { VehicleSpecs } from '@/types';
 import { PageTransition, StaggerList, StaggerItem } from '@/lib/motion';
+import GatedContent from '@/components/shared/GatedContent';
 import Topbar from '@/components/layout/Topbar';
 import StatPill from '@/components/shared/StatPill';
 import InsightCard from '@/components/shared/InsightCard';
@@ -750,8 +751,10 @@ export default function VehicleLookup() {
               </ChartCard>
             )}
 
-            {/* Pricing section */}
-            {reportData.model && reportData.priceAgg && (
+            {/* Pricing + Depreciation — subscriber only */}
+            {reportData.model && (
+              <GatedContent requires="subscriber" featureLabel="Pricing Intelligence & Depreciation">
+            {reportData.priceAgg && (
               <>
                 <Separator />
                 <div>
@@ -877,8 +880,7 @@ export default function VehicleLookup() {
               </>
             )}
 
-            {/* Depreciation section */}
-            {reportData.model && reportData.depreciation && (
+            {reportData.depreciation && (
               <>
                 <Separator />
                 <div>
@@ -988,6 +990,8 @@ export default function VehicleLookup() {
                 <Clock className="h-4 w-4 animate-spin" />
                 Loading pricing data...
               </div>
+            )}
+              </GatedContent>
             )}
           </div>
           </StaggerItem>

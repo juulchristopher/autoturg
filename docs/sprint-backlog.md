@@ -2,6 +2,24 @@
 
 ---
 
+## Sprint 6: Content Gating (DONE)
+> **Goal:** Free vs subscriber tiers visually enforced. Pricing + depreciation locked behind Pro upgrade CTA.
+> **Completed:** 2026-03-28
+
+### Task 6.1: useGate hook + GatedContent component ✓
+- `src/hooks/useGate.ts` — `canAccess(tier)` helper wrapping `useAuth()`
+- `src/components/shared/GatedContent.tsx` — blur overlay + "Upgrade to Pro" CTA pointing to `/pricing`
+
+### Task 6.2: Gate VehicleLookup pricing + depreciation ✓
+- Pricing Intelligence section (price cards, box plot, price checker, source comparison) gated
+- Depreciation Analysis section (annual %, retention badge, 5-year residual, chart) gated
+- Single `GatedContent` wrapper covers both when model is selected
+
+### Task 6.3: Gate Comparison depreciation chart ✓
+- Depreciation Comparison chart in Comparison page gated
+
+---
+
 ## Sprint 5: Payments Foundation
 > **Goal:** Users can subscribe and pay per report. Lemon Squeezy integration. No gating yet — payments exist, entitlements stored.
 > **Sprint dates:** 2026-03-28 — 2026-04-07

@@ -17,6 +17,7 @@ import ChartCard from '@/components/shared/ChartCard';
 import TrendLineChart from '@/components/charts/TrendLineChart';
 import MonthlyBarChart from '@/components/charts/MonthlyBarChart';
 import DepreciationChart from '@/components/charts/DepreciationChart';
+import GatedContent from '@/components/shared/GatedContent';
 import VehicleCombobox from '@/components/shared/VehicleCombobox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -522,18 +523,24 @@ export default function Comparison() {
               </ChartCard>
             )}
 
-            {/* Depreciation chart */}
-            {depreciationDatasets.length > 0 && (
-              <ChartCard
-                title="Depreciation Comparison"
-                subtitle="Median price by vehicle age (years)"
-              >
-                <DepreciationChart
-                  datasets={depreciationDatasets}
-                  height={320}
-                />
-              </ChartCard>
-            )}
+            {/* Depreciation chart — subscriber only */}
+            <GatedContent requires="subscriber" featureLabel="Depreciation Comparison">
+              {depreciationDatasets.length > 0 ? (
+                <ChartCard
+                  title="Depreciation Comparison"
+                  subtitle="Median price by vehicle age (years)"
+                >
+                  <DepreciationChart
+                    datasets={depreciationDatasets}
+                    height={320}
+                  />
+                </ChartCard>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-sm text-muted-foreground rounded-lg border border-dashed">
+                  Select models with pricing data to compare depreciation
+                </div>
+              )}
+            </GatedContent>
           </>
         )}
 

@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.local
 .idea/
+
+# Local env vars (never commit)
+.env
+.env.local

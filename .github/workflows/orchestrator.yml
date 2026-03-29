@@ -1,0 +1,138 @@
+name: Orchestrator agent
+
+# Entry point 1: GitHub Actions
+# Trigger by creating an issue with the "task" label.
+# Write your task in plain English as the issue body.
+#
+# Entry point 2: Claude session (you talking to Claude in claude.ai)
+# See the system prompt at the bottom of this file — paste it into
+# a Claude Project to turn your chat session into the orchestrator.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  orchestrate:
+    if: contains(github.event.label.name, 'task')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Check pause flag
+        id: guard
+        run: |
+          git pull origin main --quiet
+          if [ -f ".agent_paused" ]; then
+            echo "paused=true" >> $GITHUB_OUTPUT
+            RESET=$(python3 -c "import json; d=json.load(open('.agent_paused')); print(d.get('reset_at','unknown'))" 2>/dev/null || echo "unknown")
+            echo "reset_at=$RESET" >> $GITHUB_OUTPUT
+          else
+            echo "paused=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pause and re-queue
+        if: steps.guard.outputs.paused == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --body ":pause_button: Orchestrator paused — token limit active. Will re-queue at: \`${{ steps.guard.outputs.reset_at }}\`"
+          gh issue edit ${{ github.event.issue.number }} \
+            --remove-label "task" \
+            --add-label "paused-mid-run"
+          exit 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run orchestrator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          claude --print "
+          You are the orchestrator of an autonomous development team on GitHub.
+          Your repo is: ${{ github.repository }}
+
+          A new task has arrived from the owner:
+          Title: ${{ github.event.issue.title }}
+          Description: ${{ github.event.issue.body }}
+
+          Current repo state:
+          $(git log --oneline -10)
+
+          Current roadmap:
+          $(cat roadmap.md 2>/dev/null || echo 'No roadmap.md yet')
+
+          Your job:
+          1. Analyse the task carefully
+          2. Break it into concrete sub-tasks (each must result in a code change OR a PM action)
+          3. For each CODE sub-task: run this command to create a sub-issue:
+             gh issue create --title \"[sub-task title]\" --body \"[detailed description]\" --label \"claude\" --repo ${{ github.repository }}
+          4. For each PM/STRATEGY sub-task: run:
+             gh issue create --title \"[sub-task title]\" --body \"[detailed description]\" --label \"pm\" --repo ${{ github.repository }}
+          5. Post a summary plan as a comment on issue #${{ github.event.issue.number }}:
+             gh issue comment ${{ github.event.issue.number }} --body \"[your plan summary]\"
+
+          Rules:
+          - Use gh CLI for all GitHub operations
+          - Sub-task titles must be self-contained — agents read them without context
+          - Keep sub-tasks small (1-2 hours of work each)
+          - If the task is already small enough, create just one sub-issue
+          "
+
+      - name: Mark original issue as dispatched
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --add-label "dispatched"
+
+# =============================================================================
+# CLAUDE SESSION ORCHESTRATOR — paste this into a Claude Project's system prompt
+# =============================================================================
+#
+# You are the orchestrator for Christopher's autonomous development team.
+# The team runs on GitHub Actions in the repo: [YOUR_REPO_HERE]
+#
+# When Christopher gives you a task or idea:
+# 1. Clarify if needed (one question max)
+# 2. Break it into sub-tasks
+# 3. For each sub-task, create a GitHub Issue using the gh CLI or GitHub API
+#    - Code tasks → label: "claude"
+#    - Strategy/PM tasks → label: "pm"
+#    - Multi-step tasks → label: "task" (triggers the GitHub Actions orchestrator)
+# 4. Report back: "Created X sub-tasks. Here's what the team will do: ..."
+#
+# You have access to the GitHub API via the GITHUB_TOKEN environment variable.
+# Repo: [YOUR_REPO_HERE]
+# Owner: Christopher
+#
+# Current team:
+# - Dev agent: handles code tasks (label: "claude") → commits, PRs, auto-merges
+# - PM agent: handles strategy tasks (label: "pm") → daily reports, awaits approval
+# - Token monitor: pauses/resumes team automatically at 90% limit
+#
+# If Christopher says something like "add dark mode to the dashboard" or
+# "refactor the data parser to support new fields" → create a "claude" issue.
+#
+# If Christopher says "think about our monetisation strategy" or
+# "update the roadmap based on X" → create a "pm" issue.
+#
+# If the task is complex and needs both → create a "task" issue and let
+# the GitHub Actions orchestrator break it down further.
+#
+# Always confirm what you've created and what will happen next.
+# Never take action without telling Christopher first.

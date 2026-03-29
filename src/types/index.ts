@@ -115,3 +115,24 @@ export interface VINResult {
   plant?: string;
   serial?: string;
 }
+
+// --- Auth & Entitlement ---
+
+export type UserTier = 'free' | 'subscriber';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  tier: UserTier;
+  subscriptionStatus?: 'active' | 'paused' | 'cancelled' | 'expired';
+  expiresAt?: string;
+}
+
+export interface ReportPurchase {
+  id: string;
+  userId: string;
+  make: string;
+  model: string;
+  purchasedAt: string;
+  orderId: string;
+}

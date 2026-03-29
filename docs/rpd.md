@@ -75,6 +75,15 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 | FR-014 | Make/model/variant selector input | P0 | DONE |
 | FR-015 | VIN input field with decode | P2 | DONE — Vehicle Lookup page, VIN tab |
 | FR-016 | Registration number input field | P2 | DONE — Vehicle Lookup page, Reg tab (UI ready, pending data access) |
+| FR-017 | User authentication (email + Google OAuth) | P4 | Planned — Sprint 4, Supabase Auth |
+| FR-018 | Subscription billing (monthly + annual) | P5 | Planned — Sprint 5, Lemon Squeezy |
+| FR-019 | Pay-per-report purchase flow | P5 | Planned — Sprint 5, Lemon Squeezy one-time product |
+| FR-020 | Free tier: make-level statistics (no account required) | P4 | Planned — existing features stay free |
+| FR-021 | Subscriber tier: model/variant-level insights + pricing | P6 | Planned — Sprint 6, gated via edge functions |
+| FR-022 | Model market report (interactive + PDF export) | P7 | Planned — Sprint 7 |
+| FR-023 | Depreciation Explorer page (cross-model comparison) | P6 | Planned — Sprint 6, subscriber only |
+| FR-024 | Trends page (market share over time, model trajectories) | P6 | Planned — Sprint 6, subscriber only |
+| FR-025 | User account + report purchase history | P7 | Planned — Sprint 7, My Reports page |
 
 ---
 
@@ -85,9 +94,11 @@ Andres is a journalist covering the Estonian auto market. He needs aggregate sta
 | NFR-01 | Page load time | < 2s on broadband, < 5s on 3G |
 | NFR-02 | Data freshness | Updated by 21st of each month (Transpordiamet data) |
 | NFR-03 | Availability | GitHub Pages SLA (~99.9%) |
-| NFR-04 | Privacy | No user tracking, no cookies, no analytics |
+| NFR-04 | Privacy | GDPR compliant — email only collected, Supabase EU region (Frankfurt), no tracking |
 | NFR-05 | Accessibility | WCAG 2.1 AA for core navigation and data views |
 | NFR-06 | Browser support | Modern evergreen browsers (Chrome, Firefox, Safari, Edge) |
+| NFR-07 | EU VAT compliance | Handled by Lemon Squeezy (Merchant of Record) |
+| NFR-08 | Auth session security | Supabase JWT, HTTPS only, no sensitive data in localStorage beyond session token |
 
 ---
 

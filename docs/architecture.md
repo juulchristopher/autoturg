@@ -2,7 +2,7 @@
 
 > System components, data flow, technology decisions, and integration design.
 
-**Last updated:** 2026-03-27
+**Last updated:** 2026-03-27 (ADR-006–009 added: dual-tier monetization)
 
 ---
 
@@ -290,3 +290,29 @@ index.html (~2100 lines)
 **Decision:** parse.py tries avaandmed.eesti.ee Open Data API first, falls back to URL-guessing for Transpordiamet files.
 **Rationale:** API is more reliable and forward-looking than URL-guessing (which depends on undocumented naming conventions). Fallback ensures continuity if API is down or API key not configured.
 **Date:** 2026-03-25
+
+### ADR-006: Authentication — Supabase Auth (free tier, EU region)
+**Decision:** Use Supabase Auth for user accounts and session management.
+**Rationale:** GitHub Pages is static-only — no backend. Supabase provides email/password + Google OAuth with a JavaScript client that works directly from the browser. Free tier supports 50K MAU. EU data residency (Frankfurt) satisfies GDPR. Postgres database enables future entitlement queries server-side.
+**Alternatives rejected:** Firebase Auth (US-only free tier, weaker GDPR story), Clerk ($25/mo after 10K MAU — overkill), Auth0 (7,500 MAU free tier limit).
+**Consequences:** Introduces Supabase dependency. JWT tokens verified client-side. Supabase project must use `eu-central-1` region. Gain Postgres DB for subscriptions and report purchases tables.
+**Date:** 2026-03-27
+
+### ADR-007: Paywall — client-side gating + serverless data derivation
+**Decision:** Two-layer paywall: (1) React route/component guards check auth tier before rendering; (2) premium computed data is served by Supabase Edge Functions, never embedded in public static files.
+**Rationale:** True server-side gating of static files is impossible on GitHub Pages. The free tier (data.json make-level counts) stays fully public. Premium value is in *computed insights* — model-level price trends, depreciation curves, report data — which are calculated on the edge and require a valid JWT.
+**Consequences:** data.json remains public and unmodified. prices.json splits into a public `prices-summary.json` (make-level ranges) and a gated edge function endpoint for model-level pricing. Client-side gating can be bypassed by determined users, but the underlying premium data never ships in a public file.
+**Date:** 2026-03-27
+
+### ADR-008: Payments — Lemon Squeezy (Merchant of Record)
+**Decision:** Use Lemon Squeezy for subscription billing and one-time report purchases.
+**Rationale:** No backend required (checkout is an overlay; webhooks go to a Supabase Edge Function). Lemon Squeezy is a Merchant of Record — they handle EU VAT collection, invoicing, and OSS compliance across all EU member states, which is critical for an Estonian seller. EUR pricing native. Supports both recurring subscriptions and one-time products. 5% + $0.50 fee per transaction.
+**Alternatives rejected:** Stripe (requires handling EU VAT yourself or paying Stripe Tax fees; needs backend for webhooks), Paddle (minimum $10/mo plan; better for higher-volume SaaS).
+**Consequences:** Webhook endpoint needed (Supabase Edge Function `payment-webhook`). Entitlements managed via `subscriptions` and `report_purchases` tables in Supabase.
+**Date:** 2026-03-27
+
+### ADR-009: Report format — interactive web + client-side PDF export
+**Decision:** Pay-per-report delivers an interactive React page with a "Download PDF" button using `@react-pdf/renderer`.
+**Rationale:** Building a server-side PDF pipeline adds significant infrastructure. An interactive report is more valuable (live charts, hover tooltips). Client-side PDF generation avoids needing a headless browser. `@react-pdf/renderer` produces cleaner typeset output than `html2canvas` + `jsPDF`.
+**Consequences:** Chart components must be reimplemented as `@react-pdf/renderer` primitives for PDF output, or PDF uses a separate simplified layout. PDF quality is "good enough for market reports" — not typeset-perfect.
+**Date:** 2026-03-27

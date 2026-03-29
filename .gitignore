@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.local
 .idea/
+
+# Local env vars (never commit)
+.env
+.env.local
+
+# Supabase CLI cache
+supabase/.temp/

@@ -1,19 +1,27 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, GitCompare, Search, Database, Car } from 'lucide-react';
+import { BarChart3, GitCompare, Search, Database, Car, LogIn, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';
+import { useAuth } from '@/context/AuthContext';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import LoginDialog from '@/components/shared/LoginDialog';
+import UserMenu from '@/components/shared/UserMenu';
 
 const NAV_ITEMS = [
   { icon: BarChart3, label: 'Overview', path: '/' },
   { icon: GitCompare, label: 'Comparison', path: '/comparison' },
   { icon: Search, label: 'Vehicle Lookup', path: '/vehicle' },
   { icon: Database, label: 'Data Status', path: '/status' },
+  { icon: CreditCard, label: 'Pricing', path: '/pricing' },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const { loading, db } = useData();
+  const { user } = useAuth();
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const monthCount = db.jarelturg.length;
 
@@ -58,9 +66,9 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Status */}
-      <div className="px-5 py-4 border-t">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      {/* Status + auth */}
+      <div className="px-3 py-4 border-t space-y-3">
+        <div className="px-2 flex items-center gap-2 text-xs text-muted-foreground">
           <span
             className={cn(
               'h-2 w-2 rounded-full',
@@ -73,7 +81,30 @@ export default function Sidebar() {
           />
           {loading ? 'Loading data...' : `${monthCount} months loaded`}
         </div>
+
+        {user ? (
+          <UserMenu />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 text-xs"
+            onClick={() => setLoginOpen(true)}
+          >
+            <LogIn className="h-3.5 w-3.5" />
+            Sign in
+          </Button>
+        )}
+
+        <Link
+          to="/privacy"
+          className="block text-center text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        >
+          Privacy policy
+        </Link>
       </div>
+
+      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </aside>
   );
 }

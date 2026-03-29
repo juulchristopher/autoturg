@@ -77,7 +77,7 @@ export default function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Car className="h-5 w-5 text-primary" />
-            Autoturg Orchestrator Account
+            Autoturg Account
           </DialogTitle>
         </DialogHeader>
 

@@ -9,7 +9,7 @@ export default function Privacy() {
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Who we are</h2>
         <p className="text-sm text-muted-foreground">
-          Autoturg Orchestrator is an Estonian used car market intelligence platform. This policy explains what data we collect and how we use it.
+          Autoturg is an Estonian used car market intelligence platform. This policy explains what data we collect and how we use it.
         </p>
       </section>
 

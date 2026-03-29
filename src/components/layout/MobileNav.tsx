@@ -33,7 +33,7 @@ export default function MobileNav() {
       <div className="md:hidden flex items-center justify-between border-b px-4 py-3 bg-card">
         <Link to="/" className="flex items-center gap-2">
           <Car className="h-5 w-5 text-primary" />
-          <span className="text-sm font-bold text-primary">Autoturg Orchestrator</span>
+          <span className="text-sm font-bold text-primary">Autoturg</span>
         </Link>
 
         <Sheet open={open} onOpenChange={setOpen}>
@@ -47,7 +47,7 @@ export default function MobileNav() {
             <SheetHeader className="px-5 py-5 border-b">
               <SheetTitle className="flex items-center gap-2 text-left">
                 <Car className="h-5 w-5 text-primary" />
-                <span className="text-primary">Autoturg Orchestrator</span>
+                <span className="text-primary">Autoturg</span>
               </SheetTitle>
             </SheetHeader>
             <nav className="flex-1 px-3 py-4 space-y-1">

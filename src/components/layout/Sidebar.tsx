@@ -31,7 +31,7 @@ export default function Sidebar() {
       <div className="px-5 py-5">
         <Link to="/" className="flex items-center gap-2">
           <Car className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold text-primary">Autoturg</span>
+          <span className="text-lg font-bold text-primary">Autoturg Orchestrator</span>
         </Link>
         <p className="mt-1 text-xs text-muted-foreground">
           Estonian Vehicle Market Intelligence

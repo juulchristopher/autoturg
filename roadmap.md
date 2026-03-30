@@ -1,7 +1,7 @@
 # Autoturg Roadmap
 
+> **DRAFT — 2026-03-30. Pending owner review. Merge this PR to approve.**
 > Maintained by the PM agent. Updated daily based on commits and issues.
-> **Merge the PM report PR to approve updates.**
 
 ---
 
@@ -24,8 +24,9 @@ Free for casual browsing. Pro subscription for serious buyers. Pay-per-report fo
 - Pricing page with Free / Pro / Report tiers
 
 ### In progress 🔄
-- Stripe account setup + Edge Function deployment
-- GitHub Actions autonomous agent team
+- Stripe account setup + Edge Function deployment (Supabase env vars wired into CI)
+- GitHub Actions autonomous agent team (orchestrator, dev, PM, resume watcher — synced to main)
+- Data freshness tooltip on Overview stats (open issue, not started)
 
 ### Up next 📋
 - Sprint 7: Interactive market reports + PDF export
@@ -39,7 +40,7 @@ Free for casual browsing. Pro subscription for serious buyers. Pay-per-report fo
 | Milestone | Target | Status |
 |-----------|--------|--------|
 | Auth live (users can sign up) | Sprint 4 | ✅ Done |
-| Payments live (Stripe checkout works) | Sprint 5 | 🔄 In progress |
+| Payments live (Stripe checkout works) | Sprint 5/6 | 🔄 Pending Stripe account activation |
 | Content gating enforced | Sprint 6 | ✅ Done |
 | First paying subscriber | Q2 2026 | ⏳ |
 | 100 subscribers | Q3 2026 | ⏳ |

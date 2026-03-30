@@ -1,7 +1,7 @@
 # Autoturg Business Plan
 
+> **DRAFT — 2026-03-30. Pending owner review. Merge this PR to approve.**
 > Maintained by the PM agent. Updated when strategic context changes.
-> **Merge the PM report PR to approve updates.**
 
 ---
 
@@ -57,3 +57,9 @@ Autoturg turns that raw data into actionable market intelligence:
 | Transpordiamet changes data format | Parse.py is resilient; open data API fallback |
 | Low conversion free → paid | Sharper gating, clearer upgrade prompts |
 | Competitor copies the idea | Speed + data depth + brand loyalty |
+| Stripe activation delayed | End-to-end checkout untestable until account live; revenue start pushed |
+| Agent team runs autonomously without review | Owner reviews and merges PM PRs; dev PRs gated by CI |
+
+## Current operational note (2026-03-30)
+
+The full monetisation stack is code-complete: auth (Supabase), content gating (blur overlay), and payments (Stripe checkout + webhook). The remaining gate is Stripe account activation. Until live, no real revenue can be collected. This should be the owner's top operational priority this week.

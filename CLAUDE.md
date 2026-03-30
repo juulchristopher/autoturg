@@ -127,7 +127,12 @@ Short imperative messages. Examples from history:
 
 ## Agent Team
 
-Four persistent agents, each with their own sub-instructions in `.claude/agents/`:
+There are **two complementary agent layers**. Both coexist — they handle different entry points.
+
+### Layer 1: Claude Code agents (interactive sessions)
+
+Used when you are in a Claude Code session (CLI or claude.ai/code).
+Four persistent agents in `.claude/agents/`:
 
 | Agent | Model | When to use |
 |-------|-------|-------------|
@@ -135,6 +140,38 @@ Four persistent agents, each with their own sub-instructions in `.claude/agents/
 | **data** | Sonnet 4.6 | Python pipelines, data.json, prices.json |
 | **architect** | Opus 4.6 | Architecture decisions, schema design, sprint planning |
 | **qa** | Sonnet 4.6 | Build validation, code review, docs updates |
+
+Session lifecycle managed by `.claude/hooks/` (on-stop, on-session-start, check-usage).
+90% usage sentinel: `/tmp/autoturg-usage-stop` — stops the session before hitting the hard limit.
+
+### Layer 2: GitHub Actions agents (autonomous / background)
+
+Triggered by GitHub Issue labels. Run without you being present.
+
+| Workflow | Trigger | What it does | Auto-merges? |
+|----------|---------|--------------|-------------|
+| `orchestrator.yml` | Issue labeled `task` | Breaks task into sub-issues with `claude` or `pm` labels | No |
+| `dev_agent.yml` | Issue labeled `claude` | Implements code, commits to branch, opens PR | Yes (when CI passes) |
+| `pm_agent.yml` | Daily 08:00 UTC + PR comments | Writes daily report, updates roadmap + business plan | Never |
+| `resume_watcher.yml` | Every 5 min | Re-queues `paused-mid-run` issues after token reset | No |
+
+**How to give the team a task:**
+1. Open a GitHub Issue with a clear title and description
+2. Add label `task` (complex, needs breakdown) or `claude` (direct code task) or `pm` (strategy/reporting)
+3. The appropriate agent picks it up automatically
+
+**Token limit handling in GitHub Actions:**
+- `scripts/rate_limit_guard.py` tracks session start time in `.agent_session`
+- At 90% of the 5-hour window (4.5h elapsed), writes `.agent_paused` with `reset_at` timestamp
+- Paused issues get the `paused-mid-run` label and are re-queued by `resume_watcher.yml`
+
+**GitHub secrets required:**
+- `ANTHROPIC_API_KEY` — for all GitHub Actions agents
+- `SLACK_WEBHOOK_URL` — optional, for Slack notifications from PM agent
+
+**GitHub repo settings required (one-time, manual):**
+- Settings → General → Pull Requests → enable "Allow auto-merge" + "Automatically delete head branches"
+- Settings → Branches → branch protection on `main` requiring CI to pass (makes auto-merge safe)
 
 ### Token efficiency rules
 

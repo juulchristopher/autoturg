@@ -1,0 +1,110 @@
+name: Resume watcher
+
+# Runs every 5 minutes. If the agent pause flag exists and the estimated
+# reset time has passed, it clears the flag and re-queues paused issues
+# by swapping 'paused-mid-run' back to the original trigger label.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-resume:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull latest
+        run: git pull origin main --quiet 2>/dev/null || true
+
+      - name: Check if agents are paused
+        id: check
+        run: |
+          if [ ! -f ".agent_paused" ]; then
+            echo "paused=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "paused=true" >> $GITHUB_OUTPUT
+
+          RESET=$(python3 -c "
+          import json, sys
+          try:
+            d = json.load(open('.agent_paused'))
+            print(d.get('reset_at', ''))
+          except:
+            print('')
+          ")
+
+          if [ -z "$RESET" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NOW=$(date -u +%s)
+          RESET_TS=$(python3 -c "
+          from datetime import datetime
+          import sys
+          try:
+            dt = datetime.fromisoformat('$RESET'.replace('Z',''))
+            print(int(dt.timestamp()))
+          except:
+            print(0)
+          ")
+
+          if [ "$NOW" -ge "$RESET_TS" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            MINS=$(( ($RESET_TS - $NOW) / 60 ))
+            echo "Resume in ~${MINS} minutes (reset at $RESET)"
+          fi
+
+      - name: Clear pause flag
+        if: steps.check.outputs.paused == 'true' && steps.check.outputs.ready == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -f .agent_paused
+          git add .agent_paused 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: clear agent pause flag (token reset)"
+          git push origin main || true
+
+      - name: Re-queue paused issues
+        if: steps.check.outputs.paused == 'true' && steps.check.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find all issues with paused-mid-run label and restore their trigger label.
+          # The trigger label is stored as a note in the pause comment, or we default to 'claude'.
+          PAUSED_ISSUES=$(gh issue list \
+            --label "paused-mid-run" \
+            --json number,title,labels \
+            --limit 50)
+
+          echo "$PAUSED_ISSUES" | python3 -c "
+          import json, sys, subprocess
+
+          issues = json.load(sys.stdin)
+          for issue in issues:
+            num = issue['number']
+            labels = [l['name'] for l in issue['labels']]
+
+            # Determine original trigger label
+            # If it had 'task' in title context, restore task; otherwise claude
+            restore_label = 'claude'
+            for l in labels:
+              if l not in ('paused-mid-run',):
+                pass  # keep other labels
+
+            # Remove paused-mid-run, add restore label
+            subprocess.run(['gh', 'issue', 'edit', str(num),
+                            '--remove-label', 'paused-mid-run',
+                            '--add-label', restore_label], check=False)
+            print(f'Re-queued issue #{num} with label {restore_label}')
+          "

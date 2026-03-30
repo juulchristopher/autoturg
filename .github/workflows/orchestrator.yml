@@ -1,0 +1,93 @@
+name: Orchestrator agent
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  orchestrate:
+    if: contains(github.event.label.name, 'task')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Check pause flag
+        id: guard
+        run: |
+          git pull origin main --quiet 2>/dev/null || true
+          if [ -f ".agent_paused" ]; then
+            echo "paused=true" >> $GITHUB_OUTPUT
+            RESET=$(python3 -c "import json; d=json.load(open('.agent_paused')); print(d.get('reset_at','unknown'))" 2>/dev/null || echo "unknown")
+            echo "reset_at=$RESET" >> $GITHUB_OUTPUT
+          else
+            echo "paused=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pause and re-queue
+        if: steps.guard.outputs.paused == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --body ":pause_button: Orchestrator paused — token limit active. Will re-queue at: \`${{ steps.guard.outputs.reset_at }}\`"
+          gh issue edit ${{ github.event.issue.number }} \
+            --remove-label "task" \
+            --add-label "paused-mid-run"
+          exit 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run orchestrator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          claude --dangerously-skip-permissions -p "
+          You are the orchestrator of an autonomous development team on GitHub.
+          Your repo is: ${{ github.repository }}
+
+          A new task has arrived from the owner:
+          Title: ${{ github.event.issue.title }}
+          Description: ${{ github.event.issue.body }}
+
+          Current repo state:
+          $(git log --oneline -10)
+
+          Current roadmap:
+          $(cat roadmap.md 2>/dev/null || echo 'No roadmap.md yet')
+
+          Your job:
+          1. Analyse the task carefully
+          2. Break it into concrete sub-tasks (each must result in a code change OR a PM action)
+          3. For each CODE sub-task run:
+             gh issue create --title \"[sub-task title]\" --body \"[detailed description]\" --label \"claude\" --repo ${{ github.repository }}
+          4. For each PM/STRATEGY sub-task run:
+             gh issue create --title \"[sub-task title]\" --body \"[detailed description]\" --label \"pm\" --repo ${{ github.repository }}
+          5. Post a summary plan as a comment:
+             gh issue comment ${{ github.event.issue.number }} --body \"[your plan summary]\" --repo ${{ github.repository }}
+
+          Rules:
+          - Use gh CLI for all GitHub operations
+          - Sub-task titles must be self-contained — agents read them without context
+          - Keep sub-tasks small (1-2 hours of work each)
+          - If the task is already small enough, create just one sub-issue
+          "
+
+      - name: Mark original issue as dispatched
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --add-label "dispatched"

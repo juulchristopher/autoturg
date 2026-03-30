@@ -190,6 +190,15 @@ export default function Overview() {
                     : latestMonth?.label
                 }
                 icon={<CalendarCheck className="h-5 w-5" />}
+                tooltip={
+                  <>
+                    <span className="font-semibold">Data through {latestMonth?.label}</span>
+                    <br />
+                    Source: Transpordiamet monthly infoleht
+                    <br />
+                    Published monthly, ~4–6 weeks after period end
+                  </>
+                }
               />
             </div>
           </StaggerItem>

@@ -1,15 +1,10 @@
 name: PM agent
 
 on:
-  # Morning run — generates daily report
   schedule:
     - cron: "0 8 * * *"   # 08:00 UTC = 10:00 Tallinn
-
-  # Immediate re-run when owner comments on a pm-report PR
   issue_comment:
     types: [created]
-
-  # Manual trigger (useful for testing)
   workflow_dispatch:
     inputs:
       feedback:
@@ -17,10 +12,8 @@ on:
         required: false
 
 jobs:
-  # --- Determine why we were triggered ---
   pm-report:
     runs-on: ubuntu-latest
-    # Fire on schedule, manual trigger, OR when owner comments on a pm-report PR
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
@@ -42,7 +35,7 @@ jobs:
       - name: Check pause flag
         id: guard
         run: |
-          git pull origin main --quiet
+          git pull origin main --quiet 2>/dev/null || true
           if [ -f ".agent_paused" ]; then
             echo "paused=true" >> $GITHUB_OUTPUT
           else
@@ -70,13 +63,10 @@ jobs:
           if [ "${{ github.event_name }}" = "issue_comment" ]; then
             echo "mode=feedback" >> $GITHUB_OUTPUT
             echo "feedback=${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
-
-            # Get the PR branch so we can update it in place
             PR_NUMBER=${{ github.event.issue.number }}
             BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
             echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.feedback }}" ]; then
             echo "mode=feedback" >> $GITHUB_OUTPUT
             echo "feedback=${{ inputs.feedback }}" >> $GITHUB_OUTPUT
@@ -87,9 +77,24 @@ jobs:
             echo "branch=" >> $GITHUB_OUTPUT
           fi
 
+      - name: Create branch for daily report
+        if: steps.mode.outputs.mode == 'daily'
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          echo "TODAY=$TODAY" >> $GITHUB_ENV
+          BRANCH="pm/report-$TODAY"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+          echo "REPORT_BRANCH=$BRANCH" >> $GITHUB_ENV
+
       - name: Checkout existing PR branch (feedback mode)
         if: steps.mode.outputs.mode == 'feedback' && steps.mode.outputs.branch != ''
         run: |
+          TODAY=$(date +%Y-%m-%d)
+          echo "TODAY=$TODAY" >> $GITHUB_ENV
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin ${{ steps.mode.outputs.branch }}
           git checkout ${{ steps.mode.outputs.branch }}
 
@@ -117,16 +122,13 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          TODAY=$(date +%Y-%m-%d)
-          echo "TODAY=$TODAY" >> $GITHUB_ENV
-
-          claude --print "
-          You are a Product Manager and business strategist. Today is $TODAY.
+          claude --dangerously-skip-permissions -p "
+          You are a Product Manager and business strategist for Autoturg — an Estonian used car market intelligence platform. Today is $TODAY.
 
           Your tasks:
           1. Review the context below
-          2. Update roadmap.md to reflect current progress — mark as DRAFT
-          3. Update docs/business_plan.md with any strategic refinements — mark as DRAFT
+          2. Update roadmap.md to reflect current progress — add a DRAFT notice at the top
+          3. Update docs/business_plan.md with any strategic refinements — add a DRAFT notice at the top
           4. Write docs/reports/$TODAY.md — an executive summary for the owner
 
           Executive summary format (max 400 words):
@@ -151,33 +153,29 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          TODAY=$(date +%Y-%m-%d)
-          echo "TODAY=$TODAY" >> $GITHUB_ENV
-          FEEDBACK="${{ steps.mode.outputs.feedback }}"
-
-          claude --print "
-          You are a Product Manager and business strategist. Today is $TODAY.
+          claude --dangerously-skip-permissions -p "
+          You are a Product Manager and business strategist for Autoturg. Today is $TODAY.
 
           The owner has reviewed your previous report and has the following feedback:
 
           --- OWNER FEEDBACK ---
-          $FEEDBACK
+          ${{ steps.mode.outputs.feedback }}
           --- END FEEDBACK ---
 
           Your tasks:
           1. Carefully address every point in the feedback
-          2. Update roadmap.md accordingly — mark as DRAFT
-          3. Update docs/business_plan.md accordingly — mark as DRAFT
+          2. Update roadmap.md accordingly — keep DRAFT notice at top
+          3. Update docs/business_plan.md accordingly — keep DRAFT notice at top
           4. Rewrite docs/reports/$TODAY.md incorporating the feedback
 
-          In the updated executive summary, add a section at the top:
+          Add this section at the top of the executive summary:
           ## Changes made based on your feedback
           (List exactly what you changed and why)
 
           Then continue with the standard format.
 
           Rules:
-          - Respond to ALL feedback points — don't skip any
+          - Respond to ALL feedback points
           - Be concise — owner is waiting for a quick turnaround
           - If feedback is unclear, state your interpretation and proceed
 
@@ -185,14 +183,11 @@ jobs:
           $(cat /tmp/pm_context.txt)
           "
 
-      - name: Commit updated report
-        id: commit
+      - name: Commit report
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add roadmap.md docs/ 2>/dev/null || true
           git diff --cached --quiet || git commit -m "pm: report $TODAY [${{ steps.mode.outputs.mode }}]"
-          git push origin HEAD || true
+          git push origin HEAD
 
       - name: Create new PR (daily mode)
         if: steps.mode.outputs.mode == 'daily'
@@ -200,17 +195,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TODAY=$(date +%Y-%m-%d)
-          BRANCH="pm/report-$TODAY"
-          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
-          git push origin "$BRANCH" --force
-
           PR_URL=$(gh pr create \
             --title "PM report: $TODAY" \
-            --body "$(cat docs/reports/$TODAY.md 2>/dev/null | head -50)" \
+            --body "$(cat docs/reports/$TODAY.md 2>/dev/null | head -50)
+
+---
+*Merge to approve · Comment to request changes*" \
             --base main \
-            --head "$BRANCH" \
-            --label "pm-report" 2>/dev/null || gh pr view "$BRANCH" --json url --jq '.url')
+            --head "$REPORT_BRANCH" \
+            --label "pm-report" 2>/dev/null \
+            || gh pr view "$REPORT_BRANCH" --json url --jq '.url')
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
 
       - name: Update existing PR (feedback mode)
@@ -221,18 +215,16 @@ jobs:
           gh pr comment ${{ steps.mode.outputs.pr_number }} \
             --body ":arrows_counterclockwise: Report updated based on your feedback. Please review the new version."
 
-      - name: Notify owner
+      - name: Notify via Slack
+        if: env.SLACK_WEBHOOK_URL != ''
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           if [ "${{ steps.mode.outputs.mode }}" = "feedback" ]; then
-            MSG=":arrows_counterclockwise: *PM report revised* based on your feedback. Ready for another look."
-            LINK="${{ steps.mode.outputs.pr_number && format('PR #{0}', steps.mode.outputs.pr_number) || 'See GitHub' }}"
+            MSG=":arrows_counterclockwise: *PM report revised* based on your feedback."
           else
-            MSG=":clipboard: *Daily PM report ready for review.*"
-            LINK="${{ steps.new-pr.outputs.pr_url }}"
+            MSG=":clipboard: *Daily PM report ready for review.* ${{ steps.new-pr.outputs.pr_url }}"
           fi
-
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-type: application/json' \
-            -d "{\"text\": \"$MSG\n$LINK\"}"
+            -d "{\"text\": \"$MSG\"}"
